@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: #0b0b0f;
+    color: #ffffff;
+  }
+}
+
+@layer utilities {
+  /* Custom Animations */
+  @keyframes spin-slow {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes spin-reverse {
+    from {
+      transform: rotate(360deg);
+    }
+    to {
+      transform: rotate(0deg);
+    }
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0) translateX(0);
+      opacity: 0.3;
+    }
+    50% {
+      transform: translateY(-20px) translateX(10px);
+      opacity: 0.6;
+    }
+  }
+
+  .animate-spin-slow {
+    animation: spin-slow 20s linear infinite;
+  }
+
+  .animate-spin-reverse {
+    animation: spin-reverse 15s linear infinite;
+  }
+
+  .animate-float {
+    animation: float linear infinite;
+  }
+
+  /* Custom Slider Styles */
+  .slider-purple::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8a2be2, #ff6a00);
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.6);
+    transition: all 0.3s ease;
+  }
+
+  .slider-purple::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 20px rgba(138, 43, 226, 0.8);
+  }
+
+  .slider-purple::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8a2be2, #ff6a00);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 10px rgba(138, 43, 226, 0.6);
+    transition: all 0.3s ease;
+  }
+
+  .slider-purple::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 20px rgba(138, 43, 226, 0.8);
+  }
+
+  .slider-purple::-webkit-slider-runnable-track {
+    background: linear-gradient(90deg, #8a2be2, #ff6a00);
+    height: 8px;
+    border-radius: 4px;
+  }
+
+  .slider-purple::-moz-range-track {
+    background: linear-gradient(90deg, #8a2be2, #ff6a00);
+    height: 8px;
+    border-radius: 4px;
+  }
+
+  /* Scrollbar Styles */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #0d0d12;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #8a2be2, #ff6a00);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #9d3ef5, #ff7a1a);
+  }
+}
