@@ -42,7 +42,8 @@ export default function AISettings() {
         `https://app.neurospherevoiceai.com/api/customers/${customerId}/config`,
         {
           method: 'GET',
-          credentials: 'include'
+          credentials: 'include',
+          mode: 'cors'
         }
       );
 
@@ -66,7 +67,7 @@ export default function AISettings() {
       const customerId = localStorage.getItem('customerId') || sessionStorage.getItem('customerId');
       
       if (!customerId) {
-        setSaveMessage('Error: No customer ID found');
+        setSaveMessage('Error: No customer ID found. Please log in again.');
         return;
       }
 
@@ -75,6 +76,7 @@ export default function AISettings() {
         {
           method: 'POST',
           credentials: 'include',
+          mode: 'cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             agent: { agent_name: agentName }
@@ -86,11 +88,13 @@ export default function AISettings() {
         setSaveMessage('Agent name saved successfully!');
         setTimeout(() => setSaveMessage(''), 3000);
       } else {
-        setSaveMessage('Failed to save agent name');
+        const errorText = await res.text();
+        console.error('Save failed with status:', res.status, errorText);
+        setSaveMessage(`Failed to save agent name (Status: ${res.status})`);
       }
     } catch (error) {
       console.error('Failed to save agent name:', error);
-      setSaveMessage('Error saving agent name');
+      setSaveMessage(`Error saving agent name: ${error instanceof Error ? error.message : 'Network error'}`);
     } finally {
       setIsSavingAgent(false);
     }
@@ -104,7 +108,7 @@ export default function AISettings() {
       const customerId = localStorage.getItem('customerId') || sessionStorage.getItem('customerId');
       
       if (!customerId) {
-        setSaveMessage('Error: No customer ID found');
+        setSaveMessage('Error: No customer ID found. Please log in again.');
         return;
       }
 
@@ -113,6 +117,7 @@ export default function AISettings() {
         {
           method: 'POST',
           credentials: 'include',
+          mode: 'cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             agent: { openai_voice: selectedVoice }
@@ -124,11 +129,13 @@ export default function AISettings() {
         setSaveMessage('Voice selection saved successfully!');
         setTimeout(() => setSaveMessage(''), 3000);
       } else {
-        setSaveMessage('Failed to save voice selection');
+        const errorText = await res.text();
+        console.error('Save failed with status:', res.status, errorText);
+        setSaveMessage(`Failed to save voice selection (Status: ${res.status})`);
       }
     } catch (error) {
       console.error('Failed to save voice selection:', error);
-      setSaveMessage('Error saving voice selection');
+      setSaveMessage(`Error saving voice selection: ${error instanceof Error ? error.message : 'Network error'}`);
     } finally {
       setIsSavingVoice(false);
     }

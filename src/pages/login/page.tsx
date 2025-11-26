@@ -6,21 +6,41 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage('');
 
-    // Simulate login - store customer ID
-    setTimeout(() => {
-      // Store customer ID in localStorage
-      const customerId = `customer_${Date.now()}`;
-      localStorage.setItem('customerId', customerId);
-      localStorage.setItem('userEmail', email);
-      
+    try {
+      const res = await fetch('https://app.neurospherevoiceai.com/api/auth/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Store customer ID from response
+        if (data.customer_id) {
+          localStorage.setItem('customerId', data.customer_id);
+          localStorage.setItem('userEmail', email);
+        }
+        
+        setIsLoading(false);
+        navigate('/dashboard');
+      } else {
+        const errorData = await res.json().catch(() => ({ message: 'Login failed' }));
+        setErrorMessage(errorData.message || 'Invalid email or password');
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setErrorMessage('Network error. Please try again.');
       setIsLoading(false);
-      navigate('/dashboard');
-    }, 1000);
+    }
   };
 
   return (
@@ -41,6 +61,13 @@ export default function Login() {
             </h1>
             <p className="text-gray-400 text-sm">Login to your Core</p>
           </div>
+
+          {/* Error Message */}
+          {errorMessage && (
+            <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/50 text-red-300 text-sm text-center">
+              {errorMessage}
+            </div>
+          )}
 
           {/* Login Form */}
           <form onSubmit={handleLogin} className="space-y-6">

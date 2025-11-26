@@ -19,6 +19,9 @@ export default function Dashboard() {
   const [agentName, setAgentName] = useState('');
   const [selectedVoice, setSelectedVoice] = useState('alloy');
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+  const [isSavingAgent, setIsSavingAgent] = useState(false);
+  const [isSavingVoice, setIsSavingVoice] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
 
   const [greetingMessage, setGreetingMessage] = useState('Welcome to Neurosphere AI');
   const [transferNumber, setTransferNumber] = useState('');
@@ -45,7 +48,8 @@ export default function Dashboard() {
         `https://app.neurospherevoiceai.com/api/customers/${customerId}/config`,
         {
           method: 'GET',
-          credentials: 'include'
+          credentials: 'include',
+          mode: 'cors'
         }
       );
 
@@ -61,12 +65,90 @@ export default function Dashboard() {
     }
   };
 
-  const handleNavigateToAISettings = () => {
-    window.REACT_APP_NAVIGATE('/ai-settings');
+  const saveAgentName = async () => {
+    try {
+      setIsSavingAgent(true);
+      setSaveMessage('');
+      
+      const customerId = localStorage.getItem('customerId') || sessionStorage.getItem('customerId');
+      
+      if (!customerId) {
+        setSaveMessage('Error: No customer ID found. Please log in again.');
+        return;
+      }
+
+      const res = await fetch(
+        `https://app.neurospherevoiceai.com/api/customers/${customerId}/config`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          mode: 'cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agent: { agent_name: agentName }
+          })
+        }
+      );
+
+      if (res.ok) {
+        setSaveMessage('Agent name saved successfully!');
+        setTimeout(() => setSaveMessage(''), 3000);
+      } else {
+        const errorText = await res.text();
+        console.error('Save failed with status:', res.status, errorText);
+        setSaveMessage(`Failed to save agent name (Status: ${res.status})`);
+      }
+    } catch (error) {
+      console.error('Failed to save agent name:', error);
+      setSaveMessage(`Error saving agent name: ${error instanceof Error ? error.message : 'Network error'}`);
+    } finally {
+      setIsSavingAgent(false);
+    }
   };
 
-  const getVoiceLabel = (value: string) => {
-    return VOICE_OPTIONS.find(v => v.value === value)?.label || value;
+  const saveVoiceSelection = async () => {
+    try {
+      setIsSavingVoice(true);
+      setSaveMessage('');
+      
+      const customerId = localStorage.getItem('customerId') || sessionStorage.getItem('customerId');
+      
+      if (!customerId) {
+        setSaveMessage('Error: No customer ID found. Please log in again.');
+        return;
+      }
+
+      const res = await fetch(
+        `https://app.neurospherevoiceai.com/api/customers/${customerId}/config`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          mode: 'cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agent: { openai_voice: selectedVoice }
+          })
+        }
+      );
+
+      if (res.ok) {
+        setSaveMessage('Voice selection saved successfully!');
+        setTimeout(() => setSaveMessage(''), 3000);
+      } else {
+        const errorText = await res.text();
+        console.error('Save failed with status:', res.status, errorText);
+        setSaveMessage(`Failed to save voice selection (Status: ${res.status})`);
+      }
+    } catch (error) {
+      console.error('Failed to save voice selection:', error);
+      setSaveMessage(`Error saving voice selection: ${error instanceof Error ? error.message : 'Network error'}`);
+    } finally {
+      setIsSavingVoice(false);
+    }
+  };
+
+  const handleNavigateToAISettings = () => {
+    window.REACT_APP_NAVIGATE('/ai-settings');
   };
 
   return (
@@ -94,10 +176,30 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* Save Message */}
+        {saveMessage && (
+          <div 
+            className="max-w-7xl mx-auto mb-4 p-4 rounded-lg text-center"
+            style={{
+              background: saveMessage.includes('Error') || saveMessage.includes('Failed') 
+                ? 'rgba(239, 68, 68, 0.2)' 
+                : 'rgba(34, 197, 94, 0.2)',
+              border: `1px solid ${saveMessage.includes('Error') || saveMessage.includes('Failed') 
+                ? 'rgba(239, 68, 68, 0.5)' 
+                : 'rgba(34, 197, 94, 0.5)'}`,
+              color: saveMessage.includes('Error') || saveMessage.includes('Failed') 
+                ? '#fca5a5' 
+                : '#86efac'
+            }}
+          >
+            {saveMessage}
+          </div>
+        )}
+
         {/* Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">
           
-          {/* Panel 1: AI Agent & Voice Selection (READ-ONLY MIRROR) */}
+          {/* Panel 1: AI Agent & Voice Selection (NOW EDITABLE) */}
           <div 
             className="p-6 rounded-2xl backdrop-blur-sm"
             style={{
@@ -124,7 +226,7 @@ export default function Dashboard() {
                 style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               >
                 <i className="ri-settings-3-line mr-1" />
-                Edit in AI Settings
+                Open AI Settings
               </button>
             </div>
             
@@ -132,31 +234,61 @@ export default function Dashboard() {
               <div className="text-center py-8 text-purple-300">Loading configuration...</div>
             ) : (
               <div className="space-y-6">
-                {/* Agent Name (Read-only display) */}
+                {/* Agent Name (Now Editable) */}
                 <div>
                   <label className="block text-sm text-purple-300 mb-2">Agent Name</label>
-                  <div
-                    className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/20 rounded-lg text-white"
+                  <p className="text-xs text-gray-400 mb-3">
+                    This is the name your AI agent will use when introducing itself
+                  </p>
+                  <input
+                    type="text"
+                    value={agentName}
+                    onChange={(e) => setAgentName(e.target.value)}
+                    className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                    placeholder="Enter agent name..."
+                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                  />
+                  <button 
+                    onClick={saveAgentName}
+                    disabled={isSavingAgent}
+                    className="w-full mt-3 px-6 py-3 bg-gradient-to-r from-purple-600 to-orange-600 rounded-lg text-white font-semibold hover:shadow-lg hover:shadow-purple-500/50 transition-all duration-300 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ fontFamily: "'Space Grotesk', sans-serif" }}
                   >
-                    {agentName || 'Not set'}
-                  </div>
+                    {isSavingAgent ? 'Saving...' : 'Save Agent Name'}
+                  </button>
                 </div>
 
-                {/* Voice Selection (Read-only display) */}
+                {/* Voice Selection (Now Editable) */}
                 <div>
                   <label className="block text-sm text-purple-300 mb-2">AI Voice Selection</label>
-                  <div
-                    className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/20 rounded-lg text-white"
+                  <p className="text-xs text-gray-400 mb-3">
+                    Choose the voice your AI agent will use during calls
+                  </p>
+                  <div className="relative">
+                    <select
+                      value={selectedVoice}
+                      onChange={(e) => setSelectedVoice(e.target.value)}
+                      className="w-full px-4 py-3 pr-10 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white focus:outline-none focus:border-orange-500/50 transition-colors appearance-none cursor-pointer"
+                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                    >
+                      {VOICE_OPTIONS.map((voice) => (
+                        <option key={voice.value} value={voice.value}>
+                          {voice.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <i className="ri-arrow-down-s-line text-purple-400 text-xl" />
+                    </div>
+                  </div>
+                  <button 
+                    onClick={saveVoiceSelection}
+                    disabled={isSavingVoice}
+                    className="w-full mt-3 px-6 py-3 bg-gradient-to-r from-purple-600 to-orange-600 rounded-lg text-white font-semibold hover:shadow-lg hover:shadow-orange-500/50 transition-all duration-300 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ fontFamily: "'Space Grotesk', sans-serif" }}
                   >
-                    {getVoiceLabel(selectedVoice)}
-                  </div>
-                </div>
-
-                <div className="pt-2 text-xs text-gray-400 text-center">
-                  <i className="ri-information-line mr-1" />
-                  Changes must be made in AI Settings page
+                    {isSavingVoice ? 'Saving...' : 'Save Voice Selection'}
+                  </button>
                 </div>
               </div>
             )}
