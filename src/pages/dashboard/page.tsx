@@ -1,7 +1,36 @@
-import { useState } from 'react';
-import CoreLayout from '../../components/layout/CoreLayout';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import CoreLayout from "../../components/layout/CoreLayout";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const [userEmail, setUserEmail] = useState("");
+
+  useEffect(() => {
+    // Check authentication
+    const token = localStorage.getItem("authToken") || sessionStorage.getItem("authToken");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    // Get user info
+    const email = localStorage.getItem("userEmail") || sessionStorage.getItem("userEmail");
+    if (email) setUserEmail(email);
+  }, [navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("customerId");
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("userRole");
+    sessionStorage.removeItem("authToken");
+    sessionStorage.removeItem("customerId");
+    sessionStorage.removeItem("userEmail");
+    sessionStorage.removeItem("userRole");
+    navigate("/login");
+  };
+
   const [greetingMessage, setGreetingMessage] = useState('Welcome to Neurosphere AI');
   const [transferNumber, setTransferNumber] = useState('');
   const [aiTemperature, setAiTemperature] = useState(0.7);
