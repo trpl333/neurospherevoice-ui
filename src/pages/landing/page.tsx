@@ -42,6 +42,10 @@ export default function LandingPortal() {
     navigate("/home");
   };
 
+  const handleSkip = () => {
+    navigate("/home");
+  };
+
   const inboundFeatures = [
     "Answers Every Call Instantly",
     "Greets Callers by Name",
@@ -264,6 +268,19 @@ export default function LandingPortal() {
       {/* Main Content Container */}
       <div className="flex flex-col items-center justify-center px-6 w-full">
         
+        {/* Skip Animation Link - Above Orb */}
+        <button
+          onClick={handleSkip}
+          className="mb-8 text-gray-400 hover:text-white transition-colors duration-300 text-sm tracking-wider uppercase cursor-pointer z-50 relative"
+          style={{ 
+            fontFamily: 'Space Grotesk, sans-serif',
+            textDecoration: 'underline',
+            textUnderlineOffset: '4px'
+          }}
+        >
+          Skip Animation
+        </button>
+
         {/* Orb Container - Always visible and centered */}
         <div
           className="relative cursor-pointer group z-10 flex flex-col items-center"

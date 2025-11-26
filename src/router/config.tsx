@@ -5,11 +5,16 @@ import LandingPortal from "../pages/landing/page";
 import Dashboard from "../pages/dashboard/page";
 import UserMemories from "../pages/user-memories/page";
 import AISettings from "../pages/ai-settings/page";
+import Login from "../pages/login/page";
 
 const routes: RouteObject[] = [
   {
     path: "/",
     element: <LandingPortal />,
+  },
+  {
+    path: "/login",
+    element: <Login />,
   },
   {
     path: "/dashboard",
