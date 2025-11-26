@@ -1,4 +1,3 @@
-
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import "./landing.css";
@@ -44,19 +43,49 @@ export default function LandingPortal() {
   };
 
   const inboundFeatures = [
-    "Greets Everyone",
-    "Remembers Their Name",
-    "Transfers Calls",
-    "Call Screening",
-    "Records Call Audio",
-    "Summarizes the Call",
-    "Remembers Every Call"
+    "Answers Every Call Instantly",
+    "Greets Callers by Name",
+    "Routes Calls Intelligently (Based on Intent)",
+    "Screens & Blocks Spam / Robocalls",
+    "Captures Caller Details Automatically",
+    "Detects Urgency & Escalates to Humans",
+    "Takes Messages & Sends Summaries",
+    "Remembers Caller History & Context",
+    "Handles After-Hours / Holidays / Overflow"
   ];
 
   const outboundFeatures = [
-    "Makes Outbound Service Calls",
-    "Makes Outbound Marketing Calls",
-    "Calls to Wish Happy Birthday"
+    "Proactive Customer Service Calls",
+    "Follows Up on Unfinished Tasks",
+    "Reaches Out to New Leads Instantly",
+    "Re-Engages Dormant or Lost Customers",
+    "Schedules Appointments",
+    "Personalized Announcements or Updates",
+    "Automated Thank-You or Welcome Calls",
+    "Executes Retention & Loyalty Campaigns",
+    "Auto-Retries Missed Calls",
+    "Smart Follow-Up Texts After Each Call"
+  ];
+
+  const advancedFeatures = [
+    "Personalized Dynamic Greetings",
+    "Real-Time Caller Texting (Simultaneous SMS)",
+    "Caller Memory Across Calls",
+    "Smart Transfer to Humans",
+    "Call Screening & Spam Blocking",
+    "Automatic Call Summaries & CRM Sync",
+    "Email, SMS, and Calendar Automation",
+    "Omni-Channel Intelligence"
+  ];
+
+  const specialtyAgents = [
+    "Lead Capture Agent",
+    "Customer Follow-Up Agent",
+    "Document & Information Collection Agent",
+    "Loyalty & Re-Engagement Agent",
+    "Onboarding & Welcome Agent",
+    "VIP Priority Agent",
+    "Smart Receptionist AI (Advanced Mode)"
   ];
 
   const phrases = ["A Voice", "A Brain", "A Memory", "Finally United"];
@@ -138,9 +167,9 @@ export default function LandingPortal() {
           </div>
 
           {/* Outbound Call Agent - Top Right */}
-          <div className="absolute top-8 right-8 z-30 text-right">
+          <div className="absolute top-8 right-8 z-30">
             <h2 
-              className="text-2xl font-bold mb-4 animate-shootFromCenter"
+              className="text-2xl font-bold mb-4 animate-shootFromCenter text-right"
               style={{ 
                 fontFamily: 'Orbitron, sans-serif',
                 background: 'linear-gradient(135deg, #8a2be2 0%, #ff6a00 100%)',
@@ -155,7 +184,69 @@ export default function LandingPortal() {
                 {outboundFeatures.map((feature, index) => (
                   <div
                     key={index}
+                    className="text-gray-300 text-sm animate-cascadeIn text-left"
+                    style={{
+                      animationDelay: `${index * 0.2}s`,
+                      fontFamily: 'Space Grotesk, sans-serif'
+                    }}
+                  >
+                    • {feature}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Advanced Voice Automations - Bottom Left */}
+          <div className="absolute top-8 left-8 z-30" style={{ marginTop: '45vh' }}>
+            <h2 
+              className="text-2xl font-bold mb-4 animate-shootFromCenter"
+              style={{ 
+                fontFamily: 'Orbitron, sans-serif',
+                background: 'linear-gradient(135deg, #8a2be2 0%, #ff6a00 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
+              Advanced Voice Automations
+            </h2>
+            {animationPhase >= 2 && (
+              <div className="space-y-2">
+                {advancedFeatures.map((feature, index) => (
+                  <div
+                    key={index}
                     className="text-gray-300 text-sm animate-cascadeIn"
+                    style={{
+                      animationDelay: `${index * 0.2}s`,
+                      fontFamily: 'Space Grotesk, sans-serif'
+                    }}
+                  >
+                    • {feature}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Specialty AI Agents - Bottom Right */}
+          <div className="absolute top-8 right-8 z-30" style={{ marginTop: '45vh' }}>
+            <h2 
+              className="text-2xl font-bold mb-4 animate-shootFromCenter"
+              style={{ 
+                fontFamily: 'Orbitron, sans-serif',
+                background: 'linear-gradient(135deg, #8a2be2 0%, #ff6a00 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
+              Specialty AI Agents
+            </h2>
+            {animationPhase >= 2 && (
+              <div className="space-y-2">
+                {specialtyAgents.map((feature, index) => (
+                  <div
+                    key={index}
+                    className="text-gray-300 text-sm animate-cascadeIn text-left"
                     style={{
                       animationDelay: `${index * 0.2}s`,
                       fontFamily: 'Space Grotesk, sans-serif'
@@ -192,19 +283,32 @@ export default function LandingPortal() {
                 <div className="w-full h-full rounded-full bg-[#0b0b0f]"></div>
               </div>
               
-              {/* NS Text - Centered with Purple to Orange Gradient */}
-              <div 
-                className="relative z-10 text-[120px] font-bold select-none" 
-                style={{ 
-                  fontFamily: '"Orbitron", "Arial", sans-serif', 
-                  letterSpacing: '-0.05em',
-                  background: 'linear-gradient(135deg, #8a2be2 0%, #ff6a00 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  filter: 'drop-shadow(0 0 8px rgba(138, 43, 226, 0.4))'
-                }}
-              >
-                NS
+              {/* NS Text and Press to Enter - Centered with Purple to Orange Gradient */}
+              <div className="relative z-10 flex flex-col items-center justify-center">
+                <div 
+                  className="text-[120px] font-bold select-none leading-none" 
+                  style={{ 
+                    fontFamily: '"Orbitron", "Arial", sans-serif', 
+                    letterSpacing: '-0.05em',
+                    background: 'linear-gradient(135deg, #8a2be2 0%, #ff6a00 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    filter: 'drop-shadow(0 0 8px rgba(138, 43, 226, 0.4))'
+                  }}
+                >
+                  NS
+                </div>
+                <div 
+                  className="text-sm font-semibold tracking-wider uppercase mt-2"
+                  style={{ 
+                    fontFamily: '"Space Grotesk", "Arial", sans-serif',
+                    background: 'linear-gradient(135deg, #8a2be2 0%, #ff6a00 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                >
+                  Press to Enter
+                </div>
               </div>
             </div>
 
