@@ -4,7 +4,7 @@ import Home from "../pages/home/page";
 import LandingPortal from "../pages/landing/page";
 import Dashboard from "../pages/dashboard/page";
 import UserMemories from "../pages/user-memories/page";
-import LoginPage from "../pages/login/page";
+import AISettings from "../pages/ai-settings/page";
 
 const routes: RouteObject[] = [
   {
@@ -12,12 +12,12 @@ const routes: RouteObject[] = [
     element: <LandingPortal />,
   },
   {
-    path: "/login",
-    element: <LoginPage />,
-  },
-  {
     path: "/dashboard",
     element: <Dashboard />,
+  },
+  {
+    path: "/ai-settings",
+    element: <AISettings />,
   },
   {
     path: "/user-memories",

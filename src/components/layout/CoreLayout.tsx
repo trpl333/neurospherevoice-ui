@@ -6,6 +6,7 @@ interface CoreLayoutProps {
 }
 
 const menuItems = [
+  { icon: 'ri-dashboard-line', label: 'Dashboard', path: '/dashboard' },
   { icon: 'ri-phone-line', label: 'Phone System', path: '/phone-system' },
   { icon: 'ri-brain-line', label: 'AI Settings', path: '/ai-settings' },
   { icon: 'ri-user-line', label: 'User Memories', path: '/user-memories' },
@@ -35,13 +36,16 @@ export default function CoreLayout({ children }: CoreLayoutProps) {
         {/* Logo */}
         <div className="p-6 border-b" style={{ borderColor: 'rgba(138, 43, 226, 0.15)' }}>
           <h1 
-            className="text-2xl font-bold tracking-wider cursor-pointer whitespace-nowrap"
+            className="text-xl font-bold tracking-wider cursor-pointer"
             style={{
               fontFamily: "'Orbitron', sans-serif",
               background: 'linear-gradient(135deg, #8a2be2 0%, #ff6a00 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
-              filter: 'drop-shadow(0 0 8px rgba(138, 43, 226, 0.4))'
+              filter: 'drop-shadow(0 0 8px rgba(138, 43, 226, 0.4))',
+              wordBreak: 'keep-all',
+              whiteSpace: 'normal',
+              lineHeight: '1.3'
             }}
             onClick={() => handleNavigate('/dashboard')}
           >
