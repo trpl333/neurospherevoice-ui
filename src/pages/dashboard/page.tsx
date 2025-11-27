@@ -351,41 +351,38 @@ export default function Dashboard() {
       return;
     }
 
-    // 🔥 Fix #1 — prevent undefined/null from breaking backend
+    // Make sure we always send strings
     const safeExisting = existingGreeting ?? "";
     const safeNew = newCallerGreeting ?? "";
 
-    // 🔥 Fix #2 — backend ONLY accepts greetings inside "agent"
+    // 🔥 Save into greeting_template (NOT agent)
     const payload = {
-      agent: {
-        existing_user_greeting: safeExisting,
-        new_caller_greeting: safeNew
-      }
+      greeting_template: JSON.stringify({
+        existing: safeExisting,
+        new: safeNew,
+      }),
     };
 
     const res = await fetch(`${API_BASE}/customers/${customerId}/config`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
-    const responseData = await res.json();
+    const result = await res.json();
 
     if (res.ok) {
-      // 🔥 Fix #3 — match AI Settings success UX
       setSaveMessage("Greetings saved successfully!");
       setTimeout(() => setSaveMessage(""), 3000);
-
-      // 🔥 Fix #4 — SYNC Dashboard after save
-      await loadCustomerConfig();
+      // Phone System: leave user’s text visible
     } else {
-      console.error("Save failed:", res.status, responseData);
+      console.error("Save failed:", result);
       setSaveMessage(`Failed to save greetings (Status: ${res.status})`);
     }
   } catch (error) {
     console.error("Failed to save greetings:", error);
-    setSaveMessage("Error saving greetings");
+    setSaveMessage(`Error saving greetings: ${error.message}`);
   } finally {
     setIsSavingGreetings(false);
   }
