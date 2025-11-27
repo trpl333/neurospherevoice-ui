@@ -184,17 +184,17 @@ export default function Dashboard() {
         // I preserved them EXACTLY.
         // -------------------------------
         const existingGreetingValue =
+          config.agent?.existing_user_greeting ||          // use SAVED value first
+          config.phone?.greeting_template?.existing ||     
           config.existing_user_greeting ||
           config.greetings?.existing_user_greeting ||
-          config.phone?.greeting_template?.existing ||
-          config.agent?.existing_user_greeting ||
           '';
 
         const newCallerGreetingValue =
+          config.agent?.new_caller_greeting ||             // use SAVED value first
+          config.phone?.greeting_template?.new ||
           config.new_caller_greeting ||
           config.greetings?.new_caller_greeting ||
-          config.phone?.greeting_template?.new ||
-          config.agent?.new_caller_greeting ||
           '';
 
         setTwilioNumber(config.phone?.twilio_phone_number || '');
