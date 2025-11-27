@@ -343,53 +343,55 @@ export default function Dashboard() {
   // MUST include credentials (session required).
   // ---------------------------------------------------------------------------
   const saveGreetings = async () => {
-    try {
-      setIsSavingGreetings(true);
-      setSaveMessage('');
+  try {
+    setIsSavingGreetings(true);
+    setSaveMessage("");
 
-      const customerId = getCustomerId();
-      if (!customerId) {
-        setSaveMessage('Error: No customer ID found. Please log in again.');
-        return;
-      }
-
-      const payload = {
-        agent: {
-          existing_user_greeting: existingGreeting,
-          new_caller_greeting: newCallerGreeting
-        }
-      };
-
-      console.log('Sending greeting payload:', JSON.stringify(payload, null, 2));
-
-      const res = await fetch(
-        `${API_BASE}/customers/${customerId}/config`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        }
-      );
-
-      const responseData = await res.json();
-      console.log('Save response:', responseData);
-
-      if (res.ok) {
-        setSaveMessage('Greetings saved successfully!');
-        setTimeout(() => setSaveMessage(''), 3000);
-        await loadCustomerConfig(); // reload updated config
-      } else {
-        console.error('Save failed:', res.status, responseData);
-        setSaveMessage(`Failed to save greetings (Status: ${res.status})`);
-      }
-    } catch (error) {
-      console.error('Failed to save greetings:', error);
-      setSaveMessage('Error saving greetings');
-    } finally {
-      setIsSavingGreetings(false);
+    const customerId = getCustomerId();
+    if (!customerId) {
+      setSaveMessage("Error: No customer ID found. Please log in again.");
+      return;
     }
-  };
+
+    // 🔥 Fix #1 — prevent undefined/null from breaking backend
+    const safeExisting = existingGreeting ?? "";
+    const safeNew = newCallerGreeting ?? "";
+
+    // 🔥 Fix #2 — backend ONLY accepts greetings inside "agent"
+    const payload = {
+      agent: {
+        existing_user_greeting: safeExisting,
+        new_caller_greeting: safeNew
+      }
+    };
+
+    const res = await fetch(`${API_BASE}/customers/${customerId}/config`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const responseData = await res.json();
+
+    if (res.ok) {
+      // 🔥 Fix #3 — match AI Settings success UX
+      setSaveMessage("Greetings saved successfully!");
+      setTimeout(() => setSaveMessage(""), 3000);
+
+      // 🔥 Fix #4 — SYNC Dashboard after save
+      await loadCustomerConfig();
+    } else {
+      console.error("Save failed:", res.status, responseData);
+      setSaveMessage(`Failed to save greetings (Status: ${res.status})`);
+    }
+  } catch (error) {
+    console.error("Failed to save greetings:", error);
+    setSaveMessage("Error saving greetings");
+  } finally {
+    setIsSavingGreetings(false);
+  }
+};
 
   // ---------------------------------------------------------------------------
   // NAVIGATION HANDLERS
