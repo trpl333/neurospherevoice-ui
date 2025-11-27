@@ -1,5 +1,33 @@
+// ============================================================================
+// PHONE SYSTEM PAGE — FIXED + BACKEND-ALIGNED
+// NeuroSphere VoiceAI – Multi-Tenant Frontend
+//
+// Backend Alignment (from ChatStack):
+//   • GET /customers/<id>/config  → returns greeting_template under phone
+//   • POST /customers/<id>/config → updates MUST be nested under "agent"
+//       REF: update_customer_config() L12-L19
+//
+//   Valid POST structure for greetings:
+//     {
+//       "agent": {
+//         "existing_user_greeting": "...",
+//         "new_caller_greeting": "..."
+//       }
+//     }
+//
+//   • "greetings" as a top-level key is NOT recognized by backend
+//     (your old code used this — that’s why saving didn’t work)
+//
+//   • Session auth requires: credentials: "include"
+//     REF: customer_config.py L33-L41
+//
+// ============================================================================
+
 import { useState, useEffect } from 'react';
 import CoreLayout from '../../components/layout/CoreLayout';
+
+// Use consistent API base across all pages
+const API_BASE = import.meta.env.VITE_API_URL;
 
 export default function PhoneSystem() {
   const [twilioNumber, setTwilioNumber] = useState('');
@@ -14,47 +42,42 @@ export default function PhoneSystem() {
     loadCustomerConfig();
   }, []);
 
+  const getCustomerId = () =>
+    localStorage.getItem('customerId') || sessionStorage.getItem('customerId');
+
   const loadCustomerConfig = async () => {
     try {
-      const customerId = localStorage.getItem('customerId') || sessionStorage.getItem('customerId');
-      
+      const customerId = getCustomerId();
       if (!customerId) {
-        console.warn('No customer ID found');
         setIsLoadingConfig(false);
         return;
       }
 
       const res = await fetch(
-        `https://app.neurospherevoiceai.com/api/customers/${customerId}/config`,
+        `${API_BASE}/customers/${customerId}/config`,
         {
           method: 'GET',
-          credentials: 'include',
-          mode: 'cors'
+          credentials: 'include'
         }
       );
 
       if (res.ok) {
         const config = await res.json();
-        console.log('Full config received:', JSON.stringify(config, null, 2));
-        
-        // Try multiple possible locations for greetings
-        const existingGreetingValue = 
-          config.existing_user_greeting || 
-          config.greetings?.existing_user_greeting || 
+
+        const existingGreetingValue =
+          config.existing_user_greeting ||
+          config.greetings?.existing_user_greeting ||
           config.phone?.greeting_template?.existing ||
           config.agent?.existing_user_greeting ||
           '';
-          
-        const newCallerGreetingValue = 
-          config.new_caller_greeting || 
-          config.greetings?.new_caller_greeting || 
+
+        const newCallerGreetingValue =
+          config.new_caller_greeting ||
+          config.greetings?.new_caller_greeting ||
           config.phone?.greeting_template?.new ||
           config.agent?.new_caller_greeting ||
           '';
-        
-        console.log('Loaded existing greeting:', existingGreetingValue);
-        console.log('Loaded new caller greeting:', newCallerGreetingValue);
-        
+
         setTwilioNumber(config.phone?.twilio_phone_number || '');
         setExistingGreeting(existingGreetingValue);
         setNewCallerGreeting(newCallerGreetingValue);
@@ -70,60 +93,58 @@ export default function PhoneSystem() {
     try {
       setIsSavingGreetings(true);
       setSaveMessage('');
-      
-      const customerId = localStorage.getItem('customerId') || sessionStorage.getItem('customerId');
-      
+
+      const customerId = getCustomerId();
       if (!customerId) {
         setSaveMessage('Error: No customer ID found. Please log in again.');
         return;
       }
 
-      // Save greetings in the same format as agent_name - nested under "agent"
+      // FIXED: Correct backend structure (must be nested under "agent")
       const payload = {
-        greetings: {
+        agent: {
           existing_user_greeting: existingGreeting,
           new_caller_greeting: newCallerGreeting
         }
       };
 
-      console.log('Sending greeting payload:', JSON.stringify(payload, null, 2));
-
       const res = await fetch(
-        `https://app.neurospherevoiceai.com/api/customers/${customerId}/config`,
+        `${API_BASE}/customers/${customerId}/config`,
         {
           method: 'POST',
           credentials: 'include',
-          mode: 'cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         }
       );
 
-      const responseData = await res.json();
-      console.log('Save response:', responseData);
+      const result = await res.json();
 
       if (res.ok) {
         setSaveMessage('Greetings saved successfully!');
         setTimeout(() => setSaveMessage(''), 3000);
-        // Don't reload config - keep the user's input visible
       } else {
-        console.error('Save failed with status:', res.status, responseData);
+        console.error('Save failed:', result);
         setSaveMessage(`Failed to save greetings (Status: ${res.status})`);
       }
     } catch (error) {
       console.error('Failed to save greetings:', error);
-      setSaveMessage(`Error saving greetings: ${error instanceof Error ? error.message : 'Network error'}`);
+      setSaveMessage(`Error saving greetings: ${error.message}`);
     } finally {
       setIsSavingGreetings(false);
     }
   };
 
+  // ========================================================================
+  // UI RENDER
+  // ========================================================================
   return (
     <CoreLayout>
       <div className="p-8">
+
         {/* Header */}
         <div className="mb-8">
-          <h1 
+          <h1
             className="text-4xl font-bold mb-2"
             style={{
               fontFamily: "'Orbitron', sans-serif",
@@ -134,24 +155,29 @@ export default function PhoneSystem() {
           >
             PHONE SYSTEM
           </h1>
-          <p className="text-gray-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+          <p
+            className="text-gray-400"
+            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+          >
             Manage your phone number and greeting messages
           </p>
         </div>
 
         {/* Save Message */}
         {saveMessage && (
-          <div 
+          <div
             className="max-w-4xl mb-4 p-4 rounded-lg text-center"
             style={{
-              background: saveMessage.includes('Error') || saveMessage.includes('Failed') 
-                ? 'rgba(239, 68, 68, 0.2)' 
+              background: saveMessage.includes('Error') || saveMessage.includes('Failed')
+                ? 'rgba(239, 68, 68, 0.2)'
                 : 'rgba(34, 197, 94, 0.2)',
-              border: `1px solid ${saveMessage.includes('Error') || saveMessage.includes('Failed') 
-                ? 'rgba(239, 68, 68, 0.5)' 
-                : 'rgba(34, 197, 94, 0.5)'}`,
-              color: saveMessage.includes('Error') || saveMessage.includes('Failed') 
-                ? '#fca5a5' 
+              border: `1px solid ${
+                saveMessage.includes('Error') || saveMessage.includes('Failed')
+                  ? 'rgba(239, 68, 68, 0.5)'
+                  : 'rgba(34, 197, 94, 0.5)'
+              }`,
+              color: saveMessage.includes('Error') || saveMessage.includes('Failed')
+                ? '#fca5a5'
                 : '#86efac'
             }}
           >
@@ -160,11 +186,14 @@ export default function PhoneSystem() {
         )}
 
         {isLoadingConfig ? (
-          <div className="text-center py-12 text-purple-300">Loading configuration...</div>
+          <div className="text-center py-12 text-purple-300">
+            Loading configuration...
+          </div>
         ) : (
           <div className="max-w-4xl space-y-6">
+
             {/* Phone Number Section */}
-            <div 
+            <div
               className="p-6 rounded-2xl backdrop-blur-sm"
               style={{
                 background: 'rgba(26, 26, 36, 0.75)',
@@ -176,16 +205,18 @@ export default function PhoneSystem() {
                 <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-orange-600">
                   <i className="ri-phone-line text-white text-xl" />
                 </div>
-                <h2 
+                <h2
                   className="text-xl font-semibold text-white"
                   style={{ fontFamily: "'Space Grotesk', sans-serif" }}
                 >
                   Assigned Phone Number
                 </h2>
               </div>
-              
+
               <div>
-                <label className="block text-sm text-purple-300 mb-2">Twilio Number</label>
+                <label className="block text-sm text-purple-300 mb-2">
+                  Twilio Number
+                </label>
                 <p className="text-xs text-gray-400 mb-3">
                   Your dedicated phone number for incoming calls
                 </p>
@@ -200,7 +231,7 @@ export default function PhoneSystem() {
             </div>
 
             {/* Greeting Templates Section */}
-            <div 
+            <div
               className="p-6 rounded-2xl backdrop-blur-sm"
               style={{
                 background: 'rgba(26, 26, 36, 0.75)',
@@ -212,20 +243,23 @@ export default function PhoneSystem() {
                 <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-orange-600">
                   <i className="ri-message-3-line text-white text-xl" />
                 </div>
-                <h2 
+                <h2
                   className="text-xl font-semibold text-white"
                   style={{ fontFamily: "'Space Grotesk', sans-serif" }}
                 >
                   Greeting Templates
                 </h2>
               </div>
-              
+
               <div className="space-y-6">
+
                 {/* Existing Caller Greeting */}
                 <div>
-                  <label className="block text-sm text-purple-300 mb-2">Existing Caller Greeting</label>
+                  <label className="block text-sm text-purple-300 mb-2">
+                    Existing Caller Greeting
+                  </label>
                   <p className="text-xs text-gray-400 mb-3">
-                    This message will be used when a returning caller contacts you. You can use variables like {'{'}{'{'} caller_name {'}'}{'}'}
+                    Message used for returning callers.
                   </p>
                   <textarea
                     value={existingGreeting}
@@ -239,9 +273,11 @@ export default function PhoneSystem() {
 
                 {/* New Caller Greeting */}
                 <div>
-                  <label className="block text-sm text-purple-300 mb-2">New Caller Greeting</label>
+                  <label className="block text-sm text-purple-300 mb-2">
+                    New Caller Greeting
+                  </label>
                   <p className="text-xs text-gray-400 mb-3">
-                    This message will be used when a first-time caller contacts you. You can use variables like {'{'}{'{'} caller_name {'}'}{'}'}
+                    Message used for first-time callers.
                   </p>
                   <textarea
                     value={newCallerGreeting}
@@ -253,7 +289,7 @@ export default function PhoneSystem() {
                   />
                 </div>
 
-                <button 
+                <button
                   onClick={saveGreetings}
                   disabled={isSavingGreetings}
                   className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-orange-600 rounded-lg text-white font-semibold hover:shadow-lg hover:shadow-orange-500/50 transition-all duration-300 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
