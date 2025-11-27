@@ -357,10 +357,12 @@ export default function Dashboard() {
 
     // 🔥 Save into greeting_template (NOT agent)
     const payload = {
-      greeting_template: JSON.stringify({
-        existing: safeExisting || undefined,
-        new: safeNew || undefined,
-      }),
+      phone: {
+        greeting_template: {
+          existing: safeExisting || "",
+          new: safeNew || ""
+        }
+      }
     };
 
     const res = await fetch(`${API_BASE}/customers/${customerId}/config`, {
