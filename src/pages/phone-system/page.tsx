@@ -64,19 +64,17 @@ export default function PhoneSystem() {
       if (res.ok) {
         const config = await res.json();
 
-        const existingGreetingValue =
-          config.agent?.existing_user_greeting ||
-          config.phone?.greeting_template?.existing ||
-          config.existing_user_greeting ||
-          config.greetings?.existing_user_greeting ||
-          '';
+        let parsedGreeting = {};
 
-        const newCallerGreetingValue =
-          config.agent?.new_caller_greeting ||
-          config.phone?.greeting_template?.new ||
-          config.new_caller_greeting ||
-          config.greetings?.new_caller_greeting ||
-          '';
+        try {
+          parsedGreeting = JSON.parse(config.greeting_template || "{}");
+        } catch (e) {
+          parsedGreeting = {};
+        }
+
+        const existingGreetingValue = parsedGreeting.existing || "";
+        const newCallerGreetingValue = parsedGreeting.new || "";
+
 
         setTwilioNumber(config.phone?.twilio_phone_number || '');
         setExistingGreeting(existingGreetingValue);
