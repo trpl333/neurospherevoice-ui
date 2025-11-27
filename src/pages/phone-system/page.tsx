@@ -98,32 +98,31 @@ export default function PhoneSystem() {
       return;
     }
 
-    // 🔥 Prevent undefined/null from breaking backend
+    // Make sure we always send strings
     const safeExisting = existingGreeting ?? "";
     const safeNew = newCallerGreeting ?? "";
 
-    // 🔥 Backend requires greetings under "agent"
+    // 🔥 Save into greeting_template (NOT agent)
     const payload = {
-      agent: {
-        existing_user_greeting: safeExisting,
-        new_caller_greeting: safeNew,
-      }
+      greeting_template: JSON.stringify({
+        existing: safeExisting,
+        new: safeNew,
+      }),
     };
 
     const res = await fetch(`${API_BASE}/customers/${customerId}/config`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
     const result = await res.json();
 
     if (res.ok) {
-      // 🔥 Match AI Settings UX
       setSaveMessage("Greetings saved successfully!");
       setTimeout(() => setSaveMessage(""), 3000);
-      // 🔥 Do NOT reload here (Phone System keeps user edits visible)
+      // Phone System: leave user’s text visible
     } else {
       console.error("Save failed:", result);
       setSaveMessage(`Failed to save greetings (Status: ${res.status})`);
