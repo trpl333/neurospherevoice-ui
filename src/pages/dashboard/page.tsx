@@ -21,7 +21,13 @@ export default function Dashboard() {
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [isSavingAgent, setIsSavingAgent] = useState(false);
   const [isSavingVoice, setIsSavingVoice] = useState(false);
+  const [isSavingGreetings, setIsSavingGreetings] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+
+  // Phone System / Greeting fields
+  const [twilioNumber, setTwilioNumber] = useState('');
+  const [existingGreeting, setExistingGreeting] = useState('');
+  const [newCallerGreeting, setNewCallerGreeting] = useState('');
 
   const [greetingMessage, setGreetingMessage] = useState('Welcome to Neurosphere AI');
   const [transferNumber, setTransferNumber] = useState('');
@@ -55,8 +61,32 @@ export default function Dashboard() {
 
       if (res.ok) {
         const config = await res.json();
+        console.log('Full config received:', JSON.stringify(config, null, 2));
+        
         setAgentName(config.agent?.agent_name || '');
         setSelectedVoice(config.agent?.openai_voice || 'alloy');
+        
+        // Try multiple possible locations for greetings
+        const existingGreetingValue = 
+          config.existing_user_greeting || 
+          config.greetings?.existing_user_greeting || 
+          config.phone?.greeting_template?.existing ||
+          config.agent?.existing_user_greeting ||
+          '';
+          
+        const newCallerGreetingValue = 
+          config.new_caller_greeting || 
+          config.greetings?.new_caller_greeting || 
+          config.phone?.greeting_template?.new ||
+          config.agent?.new_caller_greeting ||
+          '';
+        
+        console.log('Loaded existing greeting:', existingGreetingValue);
+        console.log('Loaded new caller greeting:', newCallerGreetingValue);
+        
+        setTwilioNumber(config.phone?.twilio_phone_number || '');
+        setExistingGreeting(existingGreetingValue);
+        setNewCallerGreeting(newCallerGreetingValue);
       }
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -147,8 +177,65 @@ export default function Dashboard() {
     }
   };
 
+  const saveGreetings = async () => {
+    try {
+      setIsSavingGreetings(true);
+      setSaveMessage('');
+      
+      const customerId = localStorage.getItem('customerId') || sessionStorage.getItem('customerId');
+      
+      if (!customerId) {
+        setSaveMessage('Error: No customer ID found. Please log in again.');
+        return;
+      }
+
+      // Save greetings in the same format as agent_name - nested under "agent"
+      const payload = {
+        agent: {
+          existing_user_greeting: existingGreeting,
+          new_caller_greeting: newCallerGreeting
+        }
+      };
+
+      console.log('Sending greeting payload:', JSON.stringify(payload, null, 2));
+
+      const res = await fetch(
+        `https://app.neurospherevoiceai.com/api/customers/${customerId}/config`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          mode: 'cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      const responseData = await res.json();
+      console.log('Save response:', responseData);
+
+      if (res.ok) {
+        setSaveMessage('Greetings saved successfully!');
+        setTimeout(() => setSaveMessage(''), 3000);
+        // Reload config to show updated values
+        await loadCustomerConfig();
+      } else {
+        console.error('Save failed with status:', res.status, responseData);
+        setSaveMessage(`Failed to save greetings (Status: ${res.status})`);
+      }
+    } catch (error) {
+      console.error('Failed to save greetings:', error);
+      setSaveMessage(`Error saving greetings: ${error instanceof Error ? error.message : 'Network error'}`);
+    } finally {
+      setIsSavingGreetings(false);
+    }
+  };
+
   const handleNavigateToAISettings = () => {
     window.REACT_APP_NAVIGATE('/ai-settings');
+  };
+
+  const handleNavigateToPhoneSystem = () => {
+    window.REACT_APP_NAVIGATE('/phone-system');
   };
 
   return (
@@ -199,7 +286,7 @@ export default function Dashboard() {
         {/* Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">
           
-          {/* Panel 1: AI Agent & Voice Selection (NOW EDITABLE) */}
+          {/* Panel 1: AI Agent & Voice Selection */}
           <div 
             className="p-6 rounded-2xl backdrop-blur-sm"
             style={{
@@ -234,7 +321,7 @@ export default function Dashboard() {
               <div className="text-center py-8 text-purple-300">Loading configuration...</div>
             ) : (
               <div className="space-y-6">
-                {/* Agent Name (Now Editable) */}
+                {/* Agent Name */}
                 <div>
                   <label className="block text-sm text-purple-300 mb-2">Agent Name</label>
                   <p className="text-xs text-gray-400 mb-3">
@@ -258,7 +345,7 @@ export default function Dashboard() {
                   </button>
                 </div>
 
-                {/* Voice Selection (Now Editable) */}
+                {/* Voice Selection */}
                 <div>
                   <label className="block text-sm text-purple-300 mb-2">AI Voice Selection</label>
                   <p className="text-xs text-gray-400 mb-3">
@@ -294,7 +381,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Panel 2: Transfer Routing Rules */}
+          {/* Panel 2: Customer Greeting */}
           <div 
             className="p-6 rounded-2xl backdrop-blur-sm"
             style={{
@@ -303,43 +390,89 @@ export default function Dashboard() {
               boxShadow: '0 8px 32px rgba(255, 0, 140, 0.15)'
             }}
           >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-orange-600">
-                <i className="ri-phone-line text-white text-xl" />
-              </div>
-              <h2 
-                className="text-xl font-semibold text-white"
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-              >
-                Transfer Routing Rules
-              </h2>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-purple-300 mb-2">Transfer Phone Number</label>
-                <input
-                  type="tel"
-                  value={transferNumber}
-                  onChange={(e) => setTransferNumber(e.target.value)}
-                  className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white focus:outline-none focus:border-orange-500/50 transition-colors"
-                  placeholder="+1 (555) 000-0000"
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-orange-600">
+                  <i className="ri-message-3-line text-white text-xl" />
+                </div>
+                <h2 
+                  className="text-xl font-semibold text-white"
                   style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                />
+                >
+                  Customer Greeting
+                </h2>
               </div>
-              
-              <div className="flex items-center gap-3 p-3 bg-[#0d0d12] rounded-lg border border-purple-500/20">
-                <input type="checkbox" className="w-4 h-4 accent-purple-600 cursor-pointer" />
-                <span className="text-sm text-gray-300">Enable automatic transfer on keywords</span>
-              </div>
-              
-              <button 
-                className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-orange-600 rounded-lg text-white font-semibold hover:shadow-lg hover:shadow-orange-500/50 transition-all duration-300 cursor-pointer whitespace-nowrap"
+              <button
+                onClick={handleNavigateToPhoneSystem}
+                className="px-3 py-1.5 bg-purple-600/20 border border-purple-500/30 rounded-lg text-purple-300 text-sm hover:bg-purple-600/30 transition-all cursor-pointer whitespace-nowrap"
                 style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               >
-                Update Rules
+                <i className="ri-phone-line mr-1" />
+                Open Phone System
               </button>
             </div>
+            
+            {isLoadingConfig ? (
+              <div className="text-center py-8 text-purple-300">Loading configuration...</div>
+            ) : (
+              <div className="space-y-6">
+                {/* Twilio Number (Read-only) */}
+                <div>
+                  <label className="block text-sm text-purple-300 mb-2">Assigned Phone Number</label>
+                  <p className="text-xs text-gray-400 mb-3">
+                    Your dedicated Twilio number for incoming calls
+                  </p>
+                  <input
+                    type="text"
+                    value={twilioNumber}
+                    readOnly
+                    className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-gray-400 cursor-not-allowed"
+                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                  />
+                </div>
+
+                {/* Existing Caller Greeting */}
+                <div>
+                  <label className="block text-sm text-purple-300 mb-2">Existing Caller Greeting</label>
+                  <p className="text-xs text-gray-400 mb-3">
+                    Message for returning callers
+                  </p>
+                  <textarea
+                    value={existingGreeting}
+                    onChange={(e) => setExistingGreeting(e.target.value)}
+                    rows={3}
+                    className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white focus:outline-none focus:border-orange-500/50 transition-colors resize-none"
+                    placeholder="Enter greeting for existing callers..."
+                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                  />
+                </div>
+
+                {/* New Caller Greeting */}
+                <div>
+                  <label className="block text-sm text-purple-300 mb-2">New Caller Greeting</label>
+                  <p className="text-xs text-gray-400 mb-3">
+                    Message for first-time callers
+                  </p>
+                  <textarea
+                    value={newCallerGreeting}
+                    onChange={(e) => setNewCallerGreeting(e.target.value)}
+                    rows={3}
+                    className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white focus:outline-none focus:border-orange-500/50 transition-colors resize-none"
+                    placeholder="Enter greeting for new callers..."
+                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                  />
+                </div>
+
+                <button 
+                  onClick={saveGreetings}
+                  disabled={isSavingGreetings}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-orange-600 rounded-lg text-white font-semibold hover:shadow-lg hover:shadow-orange-500/50 transition-all duration-300 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                >
+                  {isSavingGreetings ? 'Saving...' : 'Save Greetings'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Panel 3: AI Behavior Controls */}
