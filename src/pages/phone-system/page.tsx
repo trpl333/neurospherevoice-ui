@@ -90,50 +90,53 @@ export default function PhoneSystem() {
   };
 
   const saveGreetings = async () => {
-    try {
-      setIsSavingGreetings(true);
-      setSaveMessage('');
+  try {
+    setIsSavingGreetings(true);
+    setSaveMessage("");
 
-      const customerId = getCustomerId();
-      if (!customerId) {
-        setSaveMessage('Error: No customer ID found. Please log in again.');
-        return;
-      }
-
-      // FIXED: Correct backend structure (must be nested under "agent")
-      const payload = {
-        agent: {
-          existing_user_greeting: existingGreeting,
-          new_caller_greeting: newCallerGreeting
-        }
-      };
-
-      const res = await fetch(
-        `${API_BASE}/customers/${customerId}/config`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        }
-      );
-
-      const result = await res.json();
-
-      if (res.ok) {
-        setSaveMessage('Greetings saved successfully!');
-        setTimeout(() => setSaveMessage(''), 3000);
-      } else {
-        console.error('Save failed:', result);
-        setSaveMessage(`Failed to save greetings (Status: ${res.status})`);
-      }
-    } catch (error) {
-      console.error('Failed to save greetings:', error);
-      setSaveMessage(`Error saving greetings: ${error.message}`);
-    } finally {
-      setIsSavingGreetings(false);
+    const customerId = getCustomerId();
+    if (!customerId) {
+      setSaveMessage("Error: No customer ID found. Please log in again.");
+      return;
     }
-  };
+
+    // 🔥 Prevent undefined/null from breaking backend
+    const safeExisting = existingGreeting ?? "";
+    const safeNew = newCallerGreeting ?? "";
+
+    // 🔥 Backend requires greetings under "agent"
+    const payload = {
+      agent: {
+        existing_user_greeting: safeExisting,
+        new_caller_greeting: safeNew,
+      }
+    };
+
+    const res = await fetch(`${API_BASE}/customers/${customerId}/config`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await res.json();
+
+    if (res.ok) {
+      // 🔥 Match AI Settings UX
+      setSaveMessage("Greetings saved successfully!");
+      setTimeout(() => setSaveMessage(""), 3000);
+      // 🔥 Do NOT reload here (Phone System keeps user edits visible)
+    } else {
+      console.error("Save failed:", result);
+      setSaveMessage(`Failed to save greetings (Status: ${res.status})`);
+    }
+  } catch (error) {
+    console.error("Failed to save greetings:", error);
+    setSaveMessage(`Error saving greetings: ${error.message}`);
+  } finally {
+    setIsSavingGreetings(false);
+  }
+};
 
   // ========================================================================
   // UI RENDER
