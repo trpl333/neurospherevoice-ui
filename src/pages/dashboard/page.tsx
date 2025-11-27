@@ -273,43 +273,55 @@ export default function Dashboard() {
   //   REF: customer_config.py L33-L41
   // ---------------------------------------------------------------------------
   const saveVoiceSelection = async () => {
-    try {
-      setIsSavingVoice(true);
-      setSaveMessage('');
+  try {
+    setIsSavingVoice(true);
+    setSaveMessage('');
 
-      const customerId = getCustomerId();
-      if (!customerId) {
-        setSaveMessage('Error: No customer ID found. Please log in again.');
-        return;
-      }
-
-      const res = await fetch(
-        `${API_BASE}/customers/${customerId}/config`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            agent: { openai_voice: selectedVoice }
-          })
-        }
-      );
-
-      if (res.ok) {
-        setSaveMessage('Voice selection saved successfully!');
-        setTimeout(() => setSaveMessage(''), 3000);
-      } else {
-        const errorText = await res.text();
-        console.error('Save failed:', res.status, errorText);
-        setSaveMessage(`Failed to save voice selection (Status: ${res.status})`);
-      }
-    } catch (error) {
-      console.error('Failed to save voice selection:', error);
-      setSaveMessage('Error saving voice selection');
-    } finally {
-      setIsSavingVoice(false);
+    const customerId = getCustomerId();
+    if (!customerId) {
+      setSaveMessage('Error: No customer ID found. Please log in again.');
+      return;
     }
-  };
+
+    // PATCH: Convert friendly UI label into real OpenAI voice ID
+    const realVoice =
+      VOICE_OPTIONS.find(
+        (v) => v.value === selectedVoice || v.label === selectedVoice
+      )?.value;
+
+    if (!realVoice) {
+      setSaveMessage('Error: Invalid voice selection.');
+      console.error('Voice sanitizer failed — selectedVoice:', selectedVoice);
+      return;
+    }
+
+    const res = await fetch(
+      `${API_BASE}/customers/${customerId}/config`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent: { openai_voice: realVoice }
+        })
+      }
+    );
+
+    if (res.ok) {
+      setSaveMessage('Voice selection saved successfully!');
+      setTimeout(() => setSaveMessage(''), 3000);
+    } else {
+      const errorText = await res.text();
+      console.error('Save failed:', res.status, errorText);
+      setSaveMessage(`Failed to save voice selection (Status: ${res.status})`);
+    }
+  } catch (error) {
+    console.error('Failed to save voice selection:', error);
+    setSaveMessage('Error saving voice selection');
+  } finally {
+    setIsSavingVoice(false);
+  }
+};
 
   // ---------------------------------------------------------------------------
   // SAVE GREETINGS (POST)
