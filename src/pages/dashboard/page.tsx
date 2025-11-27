@@ -358,8 +358,8 @@ export default function Dashboard() {
     // 🔥 Save into greeting_template (NOT agent)
     const payload = {
       greeting_template: JSON.stringify({
-        existing: safeExisting,
-        new: safeNew,
+        existing: safeExisting || undefined,
+        new: safeNew || undefined,
       }),
     };
 
