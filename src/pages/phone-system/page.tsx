@@ -104,11 +104,9 @@ export default function PhoneSystem() {
 
     // 🔥 Save into greeting_template (NOT agent)
     const payload = {
-      phone: {
-        greeting_template: {
-          existing: safeExisting || "",
-          new: safeNew || ""
-        }
+      greeting_template: {
+        existing: safeExisting || "",
+        new: safeNew || ""
       }
     };
 
