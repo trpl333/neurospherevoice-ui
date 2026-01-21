@@ -38,6 +38,38 @@ const routes: RouteObject[] = [
     path: "/home",
     element: <Home />,
   },
+    {
+    path: "/pricing",
+    element: <Pricing />,
+  },
+  {
+    path: "/onboarding",
+    element: <OnboardingStep1 />,
+  },
+  {
+    path: "/onboarding/1",
+    element: <OnboardingStep1 />,
+  },
+  {
+    path: "/onboarding/2",
+    element: <OnboardingStep2 />,
+  },
+  {
+    path: "/onboarding/3",
+    element: <OnboardingStep3 />,
+  },
+  {
+    path: "/onboarding/4",
+    element: <OnboardingStep4 />,
+  },
+  {
+    path: "/onboarding/checkout",
+    element: <OnboardingCheckout />,
+  },
+  {
+    path: "/onboarding/success",
+    element: <OnboardingSuccess />,
+  },
   {
     path: "*",
     element: <NotFound />,
