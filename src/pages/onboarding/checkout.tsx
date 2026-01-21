@@ -97,14 +97,6 @@ export default function OnboardingCheckout() {
           </button>
         </div>
 
-        {ob.plan === "enterprise" && (
-          <div className="text-sm text-white/70">
-            Enterprise onboarding is handled via a demo call. Email{" "}
-            <a className="underline" href="mailto:admin@neurospherevoiceai.com?subject=NeuroSphere%20Enterprise%20Demo">
-              admin@neurospherevoiceai.com
-            </a>.
-          </div>
-        )}
       </div>
     </OnboardingShell>
   );
