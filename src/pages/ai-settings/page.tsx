@@ -3,7 +3,7 @@ import CoreLayout from '../../components/layout/CoreLayout';
 
 // Clean American-friendly voice names (values stay the same)
 const VOICE_OPTIONS = [
-  { value: 'alloy', label: 'Alex' },
+  { value: 'alloy', label: 'Alexa' },
   { value: 'echo', label: 'Jordan' },
   { value: 'shimmer', label: 'Megan' },
 
