@@ -48,7 +48,7 @@ const routes: RouteObject[] = [
   },
     {
     path: "/pricing",
-    element: <Pricing />,
+    element: <PricingPage />,
   },
   {
     path: "/onboarding",
