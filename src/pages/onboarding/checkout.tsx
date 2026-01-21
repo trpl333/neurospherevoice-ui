@@ -51,7 +51,8 @@ export default function OnboardingCheckout() {
     navigate("/onboarding/4");
   }
 
-  const planLabel = ob.plan === "growth" ? "Growth" : ob.plan === "starter" ? "Starter" : "Enterprise";
+  const planLabel =
+  ob.plan === "growth" ? "Growth" : ob.plan === "starter" ? "Starter" : "Elite";
 
   return (
     <OnboardingShell
@@ -89,10 +90,10 @@ export default function OnboardingCheckout() {
           <button
             className="w-full rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-white/90 disabled:opacity-40"
             onClick={pay}
-            disabled={loading || ob.plan === "enterprise"}
-            title={ob.plan === "enterprise" ? "Enterprise uses demo booking, not checkout." : ""}
-          >
-            {loading ? "Starting checkout..." : ob.plan === "enterprise" ? "Enterprise (book demo)" : "Pay & Activate"}
+            disabled={loading}
+            >
+            {loading ? "Starting checkout..." : "Pay & Activate"}
+
           </button>
         </div>
 
