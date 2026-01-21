@@ -1,4 +1,4 @@
-export type PlanId = "starter" | "growth" | "enterprise";
+export type PlanId = "starter" | "growth" | "elite";
 
 export type OnboardingData = {
   sessionId: string;
