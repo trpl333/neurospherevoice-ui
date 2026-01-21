@@ -8,6 +8,14 @@ import UserMemories from "../pages/user-memories/page";
 import AISettings from "../pages/ai-settings/page";
 import PhoneSystem from "../pages/phone-system/page";
 import Login from "../pages/login/page";
+import PricingPage from "../pages/pricing/page";
+
+import OnboardingStep1 from "../pages/onboarding/step1";
+import OnboardingStep2 from "../pages/onboarding/step2";
+import OnboardingStep3 from "../pages/onboarding/step3";
+import OnboardingStep4 from "../pages/onboarding/step4";
+import OnboardingCheckout from "../pages/onboarding/checkout";
+import OnboardingSuccess from "../pages/onboarding/success";
 
 const routes: RouteObject[] = [
   {
