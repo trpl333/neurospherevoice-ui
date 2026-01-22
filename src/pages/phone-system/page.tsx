@@ -1,307 +1,475 @@
-// ============================================================================
-// PHONE SYSTEM PAGE — FIXED + BACKEND-ALIGNED
-// NeuroSphere VoiceAI – Multi-Tenant Frontend
-//
-// Backend Alignment (from ChatStack):
-//   • GET /customers/<id>/config  → returns greeting_template under phone
-//   • POST /customers/<id>/config → updates MUST be nested under "agent"
-//       REF: update_customer_config() L12-L19
-//
-//   Valid POST structure for greetings:
-//     {
-//       "agent": {
-//         "existing_user_greeting": "...",
-//         "new_caller_greeting": "..."
-//       }
-//     }
-//
-//   • "greetings" as a top-level key is NOT recognized by backend
-//     (your old code used this — that’s why saving didn’t work)
-//
-//   • Session auth requires: credentials: "include"
-//     REF: customer_config.py L33-L41
-//
-// ============================================================================
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
-import { useState, useEffect } from 'react';
-import CoreLayout from '../../components/layout/CoreLayout';
+type Speaker = "morgan" | "cora";
 
-// Use consistent API base across all pages
-const API_BASE = import.meta.env.VITE_API_URL;
-
-export default function PhoneSystem() {
-  const [twilioNumber, setTwilioNumber] = useState('');
-  const [existingGreeting, setExistingGreeting] = useState('');
-  const [newCallerGreeting, setNewCallerGreeting] = useState('');
-  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
-  const [isSavingGreetings, setIsSavingGreetings] = useState(false);
-  const [saveMessage, setSaveMessage] = useState('');
-
-  // Load customer config on mount
-  useEffect(() => {
-    loadCustomerConfig();
-  }, []);
-
-  const getCustomerId = () =>
-    localStorage.getItem('customerId') || sessionStorage.getItem('customerId');
-
-  const loadCustomerConfig = async () => {
-    try {
-      const customerId = getCustomerId();
-      if (!customerId) {
-        setIsLoadingConfig(false);
-        return;
-      }
-
-      const res = await fetch(
-        `${API_BASE}/customers/${customerId}/config`,
-        {
-          method: 'GET',
-          credentials: 'include'
-        }
-      );
-
-      if (res.ok) {
-        const config = await res.json();
-
-        let parsedGreeting = {};
-
-        try {
-          parsedGreeting = JSON.parse(config.greeting_template || "{}");
-        } catch (e) {
-          parsedGreeting = {};
-        }
-
-        const existingGreetingValue = parsedGreeting.existing || "";
-        const newCallerGreetingValue = parsedGreeting.new || "";
-
-
-        setTwilioNumber(config.phone?.twilio_phone_number || '');
-        setExistingGreeting(existingGreetingValue);
-        setNewCallerGreeting(newCallerGreetingValue);
-      }
-    } catch (error) {
-      console.error('Failed to load config:', error);
-    } finally {
-      setIsLoadingConfig(false);
-    }
-  };
-
-  const saveGreetings = async () => {
-  try {
-    setIsSavingGreetings(true);
-    setSaveMessage("");
-
-    const customerId = getCustomerId();
-    if (!customerId) {
-      setSaveMessage("Error: No customer ID found. Please log in again.");
-      return;
-    }
-
-    // Make sure we always send strings
-    const safeExisting = existingGreeting ?? "";
-    const safeNew = newCallerGreeting ?? "";
-
-    // 🔥 Save into greeting_template (NOT agent)
-    const payload = {
-      greeting_template: {
-        existing: safeExisting || "",
-        new: safeNew || ""
-      }
-    };
-
-    const res = await fetch(`${API_BASE}/customers/${customerId}/config`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const result = await res.json();
-
-    if (res.ok) {
-      setSaveMessage("Greetings saved successfully!");
-      setTimeout(() => setSaveMessage(""), 3000);
-      // Phone System: leave user’s text visible
-    } else {
-      console.error("Save failed:", result);
-      setSaveMessage(`Failed to save greetings (Status: ${res.status})`);
-    }
-  } catch (error) {
-    console.error("Failed to save greetings:", error);
-    setSaveMessage(`Error saving greetings: ${error.message}`);
-  } finally {
-    setIsSavingGreetings(false);
-  }
+type Line = {
+  speaker: Speaker;
+  text: string;
 };
 
-  // ========================================================================
-  // UI RENDER
-  // ========================================================================
-  return (
-    <CoreLayout>
-      <div className="p-8">
+function useAutoSubtitles(lines: Line[], enabled: boolean, speedMs = 2600) {
+  const [idx, setIdx] = useState(0);
 
-        {/* Header */}
-        <div className="mb-8">
-          <h1
-            className="text-4xl font-bold mb-2"
-            style={{
-              fontFamily: "'Orbitron', sans-serif",
-              background: 'linear-gradient(135deg, #8a2be2 0%, #ff6a00 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}
+  useEffect(() => {
+    if (!enabled) return;
+    if (lines.length <= 1) return;
+
+    const t = window.setInterval(() => {
+      setIdx((prev) => (prev + 1) % lines.length);
+    }, speedMs);
+
+    return () => window.clearInterval(t);
+  }, [enabled, lines.length, speedMs]);
+
+  const current = lines[Math.min(idx, lines.length - 1)];
+  return { current, idx, setIdx };
+}
+
+function AvatarCard({
+  name,
+  role,
+  subtitle,
+  accent = "from-purple-500 to-orange-400",
+}: {
+  name: string;
+  role: string;
+  subtitle: string;
+  accent?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-6">
+      <div className="flex items-center gap-4">
+        {/* Avatar placeholder (swap with real image/video later) */}
+        <div
+          className={`h-14 w-14 rounded-2xl bg-gradient-to-br ${accent} shadow-lg`}
+          aria-hidden="true"
+        />
+        <div className="leading-tight">
+          <div className="text-lg font-bold tracking-tight">{name}</div>
+          <div className="text-sm text-white/70">{role}</div>
+          <div className="mt-1 text-xs text-white/50">{subtitle}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Modal({
+  open,
+  title,
+  children,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+      <div
+        className="absolute inset-0 bg-black/70"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div className="relative w-full max-w-3xl rounded-2xl border border-white/10 bg-[#0a0a12] shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="font-semibold">{title}</div>
+          <button
+            onClick={onClose}
+            className="rounded-xl border border-white/10 px-3 py-2 text-sm text-white/80 hover:border-white/25 hover:text-white"
           >
-            PHONE SYSTEM
-          </h1>
-          <p
-            className="text-gray-400"
-            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-          >
-            Manage your phone number and greeting messages
-          </p>
+            Close
+          </button>
+        </div>
+        <div className="p-6">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+export default function PhoneSystemMarketingPage() {
+  const navigate = useNavigate();
+  const [subtitlesOn, setSubtitlesOn] = useState(true);
+  const [coraOpen, setCoraOpen] = useState(false);
+
+  const morganLines: Line[] = useMemo(
+    () => [
+      {
+        speaker: "morgan",
+        text:
+          "Hey — I’m Morgan, your Guide. Welcome to your Phone System.",
+      },
+      {
+        speaker: "morgan",
+        text:
+          "In the next 60 seconds, I’ll show you how NeuroSphere handles inbound calls like a trained employee — without the payroll, turnover, or HR drama.",
+      },
+      {
+        speaker: "morgan",
+        text:
+          "You’ll meet Cora, your Inbound Call Coordinator. And yes — you can rename any of us anytime.",
+      },
+      {
+        speaker: "morgan",
+        text:
+          "Click “Meet Cora” when you’re ready.",
+      },
+    ],
+    []
+  );
+
+  const coraLines: Line[] = useMemo(
+    () => [
+      {
+        speaker: "cora",
+        text:
+          "Hi — I’m Cora, your Inbound Call Coordinator. And yep — you can rename me anytime.",
+      },
+      {
+        speaker: "cora",
+        text:
+          "Phones steal your team’s time. Hiring someone to ‘just answer calls’ becomes wages, taxes, workers comp, sick days, turnover… and surprise HR headaches.",
+      },
+      {
+        speaker: "cora",
+        text:
+          "I answer inbound calls instantly, detect intent, collect the right info, and keep everything organized — every time.",
+      },
+      {
+        speaker: "cora",
+        text:
+          "Best part? I remember callers. When they call back, it’s continuity — not “who are you again?”",
+      },
+    ],
+    []
+  );
+
+  const { current: morganSub } = useAutoSubtitles(morganLines, subtitlesOn, 2600);
+  const { current: coraSub, setIdx: setCoraIdx } = useAutoSubtitles(
+    coraLines,
+    subtitlesOn,
+    3000
+  );
+
+  useEffect(() => {
+    // When modal opens, restart Cora subtitles at the beginning for a cleaner feel.
+    if (coraOpen) setCoraIdx(0);
+  }, [coraOpen, setCoraIdx]);
+
+  return (
+    <div className="min-h-screen w-full bg-[#0a0a12] text-white relative overflow-hidden">
+      {/* Background */}
+      <div className="absolute inset-0 opacity-30">
+        <div className="absolute inset-0" style={{
+          backgroundImage:
+            "radial-gradient(circle at 20% 10%, rgba(138,43,226,0.25), transparent 40%), radial-gradient(circle at 80% 20%, rgba(255,106,0,0.20), transparent 45%), radial-gradient(circle at 50% 80%, rgba(138,43,226,0.18), transparent 50%)"
+        }} />
+        <div className="absolute inset-0" style={{
+          backgroundImage:
+            "linear-gradient(30deg, rgba(138,43,226,0.05) 12%, transparent 12.5%, transparent 87%, rgba(138,43,226,0.05) 87.5%, rgba(138,43,226,0.05)), linear-gradient(150deg, rgba(138,43,226,0.05) 12%, transparent 12.5%, transparent 87%, rgba(138,43,226,0.05) 87.5%, rgba(138,43,226,0.05)), linear-gradient(60deg, rgba(255,106,0,0.03) 25%, transparent 25.5%, transparent 75%, rgba(255,106,0,0.03) 75%, rgba(255,106,0,0.03))",
+          backgroundSize: "80px 140px",
+          backgroundPosition: "0 0, 40px 70px, 0 0",
+        }} />
+      </div>
+
+      {/* Header */}
+      <header className="relative z-10 border-b border-white/10 bg-[#0a0a12]/70 backdrop-blur sticky top-0">
+        <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-purple-500 to-orange-400" />
+            <div className="leading-tight">
+              <div className="text-sm font-semibold tracking-wide">NeuroSphere</div>
+              <div className="text-xs text-white/60">Phone System</div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSubtitlesOn((v) => !v)}
+              className="rounded-xl border border-white/10 px-3 py-2 text-sm text-white/80 hover:border-white/25 hover:text-white"
+              title="Toggle subtitles"
+            >
+              Subtitles: {subtitlesOn ? "On" : "Off"}
+            </button>
+
+            <Link
+              to="/home"
+              className="rounded-xl border border-white/10 px-3 py-2 text-sm text-white/80 hover:border-white/25 hover:text-white"
+            >
+              Home
+            </Link>
+
+            <Link
+              to="/pricing"
+              className="rounded-xl border border-white/10 px-3 py-2 text-sm text-white/80 hover:border-white/25 hover:text-white"
+            >
+              Pricing
+            </Link>
+
+            <Link
+              to="/onboarding/1"
+              className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-white/90"
+            >
+              Start for $1
+            </Link>
+
+            <Link
+              to="/login"
+              className="rounded-xl border border-white/10 px-3 py-2 text-sm text-white/80 hover:border-white/25 hover:text-white"
+            >
+              Login
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* Content */}
+      <main className="relative z-10 mx-auto max-w-6xl px-6 py-14">
+        {/* Hero */}
+        <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] items-start">
+          <div>
+            <h1
+              className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-purple-300 to-orange-300 bg-clip-text text-transparent"
+              style={{ fontFamily: "Orbitron, sans-serif" }}
+            >
+              Your Phone System, Run by AI Employees
+            </h1>
+
+            <p className="mt-4 text-white/70 max-w-2xl leading-relaxed">
+              Stop bleeding time on repetitive calls. NeuroSphere answers, qualifies, schedules,
+              transfers, and follows up — and it remembers every caller so your agency feels
+              instantly sharper.
+            </p>
+
+            {/* Morgan speaking panel */}
+            <div className="mt-8">
+              <AvatarCard
+                name="Morgan"
+                role="Guide"
+                subtitle="(You can rename me anytime.)"
+                accent="from-purple-500 to-orange-400"
+              />
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
+                <div className="text-xs text-white/50 mb-2">
+                  Morgan says (subtitles)
+                </div>
+                <div className="text-sm md:text-base text-white/85 leading-relaxed">
+                  {subtitlesOn ? morganSub?.text : "Subtitles are off."}
+                </div>
+
+                <div className="mt-5 flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => setCoraOpen(true)}
+                    className="rounded-xl bg-gradient-to-r from-purple-500 to-orange-400 px-5 py-3 text-sm font-semibold text-white hover:from-purple-600 hover:to-orange-500"
+                  >
+                    Meet Cora (Inbound Call Coordinator)
+                  </button>
+
+                  <button
+                    onClick={() => navigate("/pricing")}
+                    className="rounded-xl border border-white/15 px-5 py-3 text-sm font-semibold text-white/90 hover:border-white/30"
+                  >
+                    View Pricing
+                  </button>
+
+                  <button
+                    onClick={() => navigate("/onboarding/1")}
+                    className="rounded-xl bg-white/90 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-white"
+                  >
+                    Start for $1
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right rail: Quick bullets */}
+          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-6">
+            <div className="text-sm font-semibold text-white/90">What this replaces</div>
+            <ul className="mt-4 space-y-3 text-sm text-white/70">
+              <li className="flex gap-3">
+                <span className="mt-[5px] h-2 w-2 rounded-full bg-white/40" />
+                Front desk / inbound call handling
+              </li>
+              <li className="flex gap-3">
+                <span className="mt-[5px] h-2 w-2 rounded-full bg-white/40" />
+                Manual intake + “what was your name again?”
+              </li>
+              <li className="flex gap-3">
+                <span className="mt-[5px] h-2 w-2 rounded-full bg-white/40" />
+                Constant interruptions while your team tries to sell/service
+              </li>
+              <li className="flex gap-3">
+                <span className="mt-[5px] h-2 w-2 rounded-full bg-white/40" />
+                HR overhead: hiring, training, turnover, call-outs
+              </li>
+            </ul>
+
+            <div className="mt-6 border-t border-white/10 pt-6">
+              <div className="text-sm font-semibold text-white/90">Cora can:</div>
+              <ul className="mt-3 space-y-3 text-sm text-white/70">
+                <li className="flex gap-3">
+                  <span className="mt-[5px] h-2 w-2 rounded-full bg-purple-400/60" />
+                  Answer instantly + detect intent (quote, service, billing, claims)
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-[5px] h-2 w-2 rounded-full bg-purple-400/60" />
+                  Collect structured info and log summaries automatically
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-[5px] h-2 w-2 rounded-full bg-purple-400/60" />
+                  Transfer & screen calls (“who is calling and why?”)
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-[5px] h-2 w-2 rounded-full bg-purple-400/60" />
+                  Schedule appointments and send confirmations by text/email
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-[5px] h-2 w-2 rounded-full bg-purple-400/60" />
+                  Remember callers — continuity on repeat calls
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
 
-        {/* Save Message */}
-        {saveMessage && (
-          <div
-            className="max-w-4xl mb-4 p-4 rounded-lg text-center"
-            style={{
-              background: saveMessage.includes('Error') || saveMessage.includes('Failed')
-                ? 'rgba(239, 68, 68, 0.2)'
-                : 'rgba(34, 197, 94, 0.2)',
-              border: `1px solid ${
-                saveMessage.includes('Error') || saveMessage.includes('Failed')
-                  ? 'rgba(239, 68, 68, 0.5)'
-                  : 'rgba(34, 197, 94, 0.5)'
-              }`,
-              color: saveMessage.includes('Error') || saveMessage.includes('Failed')
-                ? '#fca5a5'
-                : '#86efac'
-            }}
-          >
-            {saveMessage}
-          </div>
-        )}
+        {/* How it works */}
+        <section className="mt-14">
+          <h2 className="text-2xl font-bold tracking-tight">Setup is stupid simple</h2>
+          <p className="mt-2 text-white/70 max-w-3xl">
+            You don’t need to be technical. You configure your AI employee like you would onboard a real one.
+          </p>
 
-        {isLoadingConfig ? (
-          <div className="text-center py-12 text-purple-300">
-            Loading configuration...
-          </div>
-        ) : (
-          <div className="max-w-4xl space-y-6">
-
-            {/* Phone Number Section */}
-            <div
-              className="p-6 rounded-2xl backdrop-blur-sm"
-              style={{
-                background: 'rgba(26, 26, 36, 0.75)',
-                border: '1px solid rgba(138, 43, 226, 0.3)',
-                boxShadow: '0 8px 32px rgba(255, 0, 140, 0.15)'
-              }}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-orange-600">
-                  <i className="ri-phone-line text-white text-xl" />
-                </div>
-                <h2
-                  className="text-xl font-semibold text-white"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                >
-                  Assigned Phone Number
-                </h2>
+          <div className="mt-6 grid gap-4 md:grid-cols-4">
+            {[
+              { n: "1", t: "Name & Voice", d: "Keep defaults or rename + choose a voice." },
+              { n: "2", t: "Greeting & Hours", d: "Business-hours and after-hours behavior." },
+              { n: "3", t: "Knowledge Base", d: "FAQs, services, what you do and don’t do." },
+              { n: "4", t: "Transfers & Booking", d: "Who gets what calls, and calendar booking rules." },
+            ].map((x) => (
+              <div
+                key={x.n}
+                className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5"
+              >
+                <div className="text-xs text-white/50">Step {x.n}</div>
+                <div className="mt-1 font-semibold">{x.t}</div>
+                <div className="mt-2 text-sm text-white/70">{x.d}</div>
               </div>
+            ))}
+          </div>
 
-              <div>
-                <label className="block text-sm text-purple-300 mb-2">
-                  Twilio Number
-                </label>
-                <p className="text-xs text-gray-400 mb-3">
-                  Your dedicated phone number for incoming calls
-                </p>
-                <input
-                  type="text"
-                  value={twilioNumber}
-                  readOnly
-                  className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-gray-400 cursor-not-allowed text-lg font-mono"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                />
+          <div className="mt-8 flex flex-col sm:flex-row gap-3">
+            <Link
+              to="/onboarding/1"
+              className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-white/90"
+            >
+              Start for $1
+            </Link>
+            <Link
+              to="/pricing"
+              className="inline-flex items-center justify-center rounded-xl border border-white/15 px-5 py-3 text-sm font-semibold text-white/90 hover:border-white/30"
+            >
+              View Pricing
+            </Link>
+          </div>
+        </section>
+      </main>
+
+      {/* Cora modal */}
+      <Modal
+        open={coraOpen}
+        title="Meet Cora — Inbound Call Coordinator"
+        onClose={() => setCoraOpen(false)}
+      >
+        <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
+            <AvatarCard
+              name="Cora"
+              role="Inbound Call Coordinator"
+              subtitle="(You can rename me anytime.)"
+              accent="from-orange-400 to-purple-500"
+            />
+
+            <div className="mt-4 rounded-2xl border border-white/10 bg-[#0a0a12]/40 p-4">
+              <div className="text-xs text-white/50 mb-2">Cora says (subtitles)</div>
+              <div className="text-sm text-white/85 leading-relaxed">
+                {subtitlesOn ? coraSub?.text : "Subtitles are off."}
+              </div>
+              <div className="mt-3 text-xs text-white/50">
+                Tip: later we can swap this box for a real video avatar + WebVTT captions.
               </div>
             </div>
 
-            {/* Greeting Templates Section */}
-            <div
-              className="p-6 rounded-2xl backdrop-blur-sm"
-              style={{
-                background: 'rgba(26, 26, 36, 0.75)',
-                border: '1px solid rgba(138, 43, 226, 0.3)',
-                boxShadow: '0 8px 32px rgba(255, 0, 140, 0.15)'
-              }}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-orange-600">
-                  <i className="ri-message-3-line text-white text-xl" />
-                </div>
-                <h2
-                  className="text-xl font-semibold text-white"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                >
-                  Greeting Templates
-                </h2>
-              </div>
+            <div className="mt-5 flex flex-col sm:flex-row gap-3">
+              <Link
+                to="/onboarding/1"
+                className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-500 to-orange-400 px-5 py-3 text-sm font-semibold text-white hover:from-purple-600 hover:to-orange-500"
+              >
+                Start for $1
+              </Link>
 
-              <div className="space-y-6">
-
-                {/* Existing Caller Greeting */}
-                <div>
-                  <label className="block text-sm text-purple-300 mb-2">
-                    Existing Caller Greeting
-                  </label>
-                  <p className="text-xs text-gray-400 mb-3">
-                    Message used for returning callers.
-                  </p>
-                  <textarea
-                    value={existingGreeting}
-                    onChange={(e) => setExistingGreeting(e.target.value)}
-                    rows={4}
-                    className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white focus:outline-none focus:border-orange-500/50 transition-colors resize-none"
-                    placeholder="Enter greeting for existing callers..."
-                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                  />
-                </div>
-
-                {/* New Caller Greeting */}
-                <div>
-                  <label className="block text-sm text-purple-300 mb-2">
-                    New Caller Greeting
-                  </label>
-                  <p className="text-xs text-gray-400 mb-3">
-                    Message used for first-time callers.
-                  </p>
-                  <textarea
-                    value={newCallerGreeting}
-                    onChange={(e) => setNewCallerGreeting(e.target.value)}
-                    rows={4}
-                    className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white focus:outline-none focus:border-orange-500/50 transition-colors resize-none"
-                    placeholder="Enter greeting for new callers..."
-                    style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                  />
-                </div>
-
-                <button
-                  onClick={saveGreetings}
-                  disabled={isSavingGreetings}
-                  className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-orange-600 rounded-lg text-white font-semibold hover:shadow-lg hover:shadow-orange-500/50 transition-all duration-300 cursor-pointer whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                >
-                  {isSavingGreetings ? 'Saving...' : 'Save Greeting Templates'}
-                </button>
-              </div>
+              <Link
+                to="/pricing"
+                className="inline-flex items-center justify-center rounded-xl border border-white/15 px-5 py-3 text-sm font-semibold text-white/90 hover:border-white/30"
+              >
+                View Pricing
+              </Link>
             </div>
           </div>
-        )}
-      </div>
-    </CoreLayout>
+
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
+              <div className="text-sm font-semibold">The HR pain I delete</div>
+              <ul className="mt-3 space-y-2 text-sm text-white/70">
+                <li>• Wages + payroll tax + workers comp</li>
+                <li>• Call-outs, turnover, training cycles</li>
+                <li>• Interruptions that kill producer productivity</li>
+                <li>• Inconsistent call handling quality</li>
+              </ul>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
+              <div className="text-sm font-semibold">What I handle on every call</div>
+              <ul className="mt-3 space-y-2 text-sm text-white/70">
+                <li>• Detect intent: quote, service, billing, claims</li>
+                <li>• Gather structured info (so your team doesn’t)</li>
+                <li>• Answer FAQs from your knowledge base</li>
+                <li>• Transfer calls — and screen before patching through</li>
+                <li>• Schedule appointments by checking availability</li>
+                <li>• Send confirmations via text/email</li>
+                <li>• Log a summary + next steps automatically</li>
+                <li className="text-white/85 font-semibold">
+                  • Remember callers and continue where you left off
+                </li>
+              </ul>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
+              <div className="text-sm font-semibold">Setup (minutes, not weeks)</div>
+              <ul className="mt-3 space-y-2 text-sm text-white/70">
+                <li>• Choose my name + voice (or keep defaults)</li>
+                <li>• Set greeting + business hours</li>
+                <li>• Add transfer targets + calendars</li>
+                <li>• Drop in FAQs / knowledge base</li>
+                <li>• Go live</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </Modal>
+    </div>
   );
 }
