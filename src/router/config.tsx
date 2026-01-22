@@ -1,4 +1,3 @@
-
 import type { RouteObject } from "react-router-dom";
 import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
@@ -9,6 +8,7 @@ import AISettings from "../pages/ai-settings/page";
 import PhoneSystem from "../pages/phone-system/page";
 import Login from "../pages/login/page";
 import PricingPage from "../pages/pricing/page";
+import Register from "../pages/register/page";
 
 import OnboardingStep1 from "../pages/onboarding/step1";
 import OnboardingStep2 from "../pages/onboarding/step2";
@@ -46,9 +46,13 @@ const routes: RouteObject[] = [
     path: "/home",
     element: <Home />,
   },
-    {
+  {
     path: "/pricing",
     element: <PricingPage />,
+  },
+  {
+    path: "/register",
+    element: <Register />,
   },
   {
     path: "/onboarding",
