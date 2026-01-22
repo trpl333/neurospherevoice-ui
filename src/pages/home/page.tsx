@@ -34,7 +34,7 @@ export default function MarketingHome() {
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 mt-6">
           <Link
-            o="/pricing"
+            to="/pricing"
             className="px-10 py-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 hover:from-purple-600 hover:to-orange-500 transition-all duration-300 text-white font-semibold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 whitespace-nowrap cursor-pointer text-center"
             style={{ fontFamily: "Space Grotesk, sans-serif" }}
           >
