@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 export default function MarketingHome() {
   return (
     <div className="min-h-screen w-full bg-[#0a0a12] text-white relative overflow-hidden">
@@ -32,21 +33,37 @@ export default function MarketingHome() {
 
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 mt-6">
-          <a
-            href="/login"
-            className="px-10 py-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 hover:from-purple-600 hover:to-orange-500 transition-all duration-300 text-white font-semibold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 whitespace-nowrap cursor-pointer"
-            style={{ fontFamily: 'Space Grotesk, sans-serif' }}
+          <Link
+            o="/pricing"
+            className="px-10 py-4 rounded-lg bg-gradient-to-r from-purple-500 to-orange-400 hover:from-purple-600 hover:to-orange-500 transition-all duration-300 text-white font-semibold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 whitespace-nowrap cursor-pointer text-center"
+            style={{ fontFamily: "Space Grotesk, sans-serif" }}
           >
-            Login to Core
-          </a>
+            View Pricing
+          </Link>
 
-          <a
-            href="/register"
-            className="px-10 py-4 rounded-lg border-2 border-purple-400/60 hover:bg-purple-600/30 hover:border-purple-400 transition-all duration-300 font-semibold backdrop-blur-sm whitespace-nowrap cursor-pointer"
-            style={{ fontFamily: 'Space Grotesk, sans-serif' }}
+          <Link
+            to="/onboarding/1"
+           className="px-10 py-4 rounded-lg bg-white/90 text-[#0a0a12] hover:bg-white transition-all duration-300 font-semibold shadow-lg hover:scale-105 whitespace-nowrap cursor-pointer text-center"
+           style={{ fontFamily: "Space Grotesk, sans-serif" }}
+          >
+            Start for $1
+          </Link>
+
+          <Link
+            to="/login"
+            className="px-10 py-4 rounded-lg border-2 border-purple-400/60 hover:bg-purple-600/30 hover:border-purple-400 transition-all duration-300 font-semibold backdrop-blur-sm whitespace-nowrap cursor-pointer text-center"
+            style={{ fontFamily: "Space Grotesk, sans-serif" }}
+          >
+            Login
+          </Link>
+
+          <Link
+            to="/register"
+            className="px-10 py-4 rounded-lg border-2 border-white/15 hover:border-white/30 hover:bg-white/5 transition-all duration-300 font-semibold backdrop-blur-sm whitespace-nowrap cursor-pointer text-center"
+            style={{ fontFamily: "Space Grotesk, sans-serif" }}
           >
             Create Account
-          </a>
+          </Link>
         </div>
 
         {/* Feature Highlights */}
