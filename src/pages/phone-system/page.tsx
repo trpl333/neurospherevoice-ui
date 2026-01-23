@@ -285,6 +285,8 @@ export default function PhoneSystemMarketingPage() {
                 <button
                   onClick={() => {
                     setCoraOpen(true);
+                    setCoraMuted(true);
+                    setCoraPaused(false);
                     setHighlightMeetCora(false);
                   }}
                   className={[
@@ -385,6 +387,8 @@ export default function PhoneSystemMarketingPage() {
               onCueMeetCora={() => setHighlightMeetCora(true)}
               onMeetCora={() => {
                 setCoraOpen(true);
+                setCoraMuted(true);
+                setCoraPaused(false);
                 setHighlightMeetCora(false);
               }}
             />
