@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+/**
+ * Rewritten:
+ * - Modal supports internal scrolling
+ * - Cora modal has a sticky footer CTA (always visible; no scroll hunt)
+ * - "Click Start" routes to /pricing?trial=1 so user chooses plan for post-trial
+ */
+
 function Modal({
   open,
   title,
@@ -40,6 +47,8 @@ function Modal({
             Close
           </button>
         </div>
+
+        {/* Scroll container */}
         <div className="p-6 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
@@ -60,18 +69,18 @@ function MorganGuidePanel({
 
   const MORGAN_VIDEO_URL =
     "https://personal-sam-artifacts.sfo3.cdn.digitaloceanspaces.com/Neurosphere%20Folder/Videos/Avatars/morgan_phone_system_intro_v1.mp4.mp4";
+
   useEffect(() => {
     const v = vidRef.current;
     if (!v) return;
 
-    // try to start WITH sound
+    // attempt autoplay with sound; fallback to muted if blocked
     v.muted = false;
     setMuted(false);
 
     const p = v.play();
     if (p && typeof p.catch === "function") {
-     p.catch(() => {
-        // browser blocked autoplay-with-sound → fallback to muted autoplay
+      p.catch(() => {
         v.muted = true;
         setMuted(true);
         v.play().catch(() => {});
@@ -122,7 +131,7 @@ function MorganGuidePanel({
         </div>
       </div>
 
-      {/* Video - “lives in page” (no player controls, no loop) */}
+      {/* Video */}
       <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
         <div className="relative aspect-[9/16]">
           <video
@@ -137,7 +146,6 @@ function MorganGuidePanel({
             onEnded={() => setPaused(true)}
             onTimeUpdate={(e) => {
               const t = e.currentTarget.currentTime;
-              // Cue the glow when Morgan says “click Meet Cora” (~32s)
               if (!hasCuedRef.current && t >= 32) {
                 hasCuedRef.current = true;
                 onCueMeetCora();
@@ -157,7 +165,6 @@ function MorganGuidePanel({
       <div className="mt-4 grid grid-cols-2 gap-3">
         <button
           onClick={() => {
-            // Auto-pause Morgan when opening Cora
             const v = vidRef.current;
             if (v && !v.paused) {
               v.pause();
@@ -171,10 +178,10 @@ function MorganGuidePanel({
         </button>
 
         <Link
-          to="/onboarding/1"
+          to="/pricing?trial=1"
           className="rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 hover:bg-white/90 text-center"
         >
-          Start for $1
+          Click Start
         </Link>
 
         <Link
@@ -193,39 +200,37 @@ export default function PhoneSystemMarketingPage() {
 
   const [coraOpen, setCoraOpen] = useState(false);
   const [highlightMeetCora, setHighlightMeetCora] = useState(false);
+
   const [coraMuted, setCoraMuted] = useState(false);
   const [coraPaused, setCoraPaused] = useState(false);
   const coraVidRef = useRef<HTMLVideoElement | null>(null);
 
   const CORA_VIDEO_URL =
     "https://personal-sam-artifacts.sfo3.cdn.digitaloceanspaces.com/Neurosphere%20Folder/Videos/Avatars/Meet%20Cora%20(1).mp4";
+
   useEffect(() => {
     if (!coraOpen) return;
 
     const v = coraVidRef.current;
     if (!v) return;
 
-    // reset each time modal opens
     v.currentTime = 0;
 
-    // try to start WITH sound
+    // attempt autoplay with sound; fallback to muted
     v.muted = false;
     setCoraMuted(false);
     setCoraPaused(false);
 
-  const p = v.play();
-  if (p && typeof p.catch === "function") {
-    p.catch(() => {
-      // fallback to muted if blocked
-      v.muted = true;
-      setCoraMuted(true);
-      v.play().catch(() => {});
-    });
-  }
-}, [coraOpen]);
+    const p = v.play();
+    if (p && typeof p.catch === "function") {
+      p.catch(() => {
+        v.muted = true;
+        setCoraMuted(true);
+        v.play().catch(() => {});
+      });
+    }
+  }, [coraOpen]);
 
-
-  // turn off highlight after 12s
   useEffect(() => {
     if (!highlightMeetCora) return;
     const t = window.setTimeout(() => setHighlightMeetCora(false), 12000);
@@ -281,10 +286,10 @@ export default function PhoneSystemMarketingPage() {
             </Link>
 
             <Link
-              to="/onboarding/1"
+              to="/pricing?trial=1"
               className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-white/90"
             >
-              Start for $1
+              Click Start
             </Link>
 
             <Link
@@ -300,7 +305,7 @@ export default function PhoneSystemMarketingPage() {
       {/* Content */}
       <main className="relative z-10 mx-auto max-w-6xl px-6 py-14">
         <div className="grid gap-8 lg:grid-cols-[1fr_380px] items-start">
-          {/* Left content */}
+          {/* Left */}
           <div>
             <h1
               className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-purple-300 to-orange-300 bg-clip-text text-transparent"
@@ -310,8 +315,9 @@ export default function PhoneSystemMarketingPage() {
             </h1>
 
             <p className="mt-4 text-white/70 max-w-2xl leading-relaxed">
-              Stop bleeding time on repetitive calls. NeuroSphere answers, qualifies, schedules,
-              transfers, and follows up — and it remembers every caller so your agency feels instantly sharper.
+              Stop bleeding time on repetitive calls. NeuroSphere answers,
+              qualifies, schedules, transfers, and follows up — and it remembers
+              every caller so your agency feels instantly sharper.
             </p>
 
             {/* Primary CTAs */}
@@ -351,17 +357,19 @@ export default function PhoneSystemMarketingPage() {
               </button>
 
               <button
-                onClick={() => navigate("/onboarding/1")}
+                onClick={() => navigate("/pricing?trial=1")}
                 className="rounded-xl bg-white/90 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-white"
               >
-                Start for $1
+                Click Start
               </button>
             </div>
 
             {/* Value blocks */}
             <div className="mt-10 grid gap-4 md:grid-cols-2">
               <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-6">
-                <div className="text-sm font-semibold text-white/90">What this replaces</div>
+                <div className="text-sm font-semibold text-white/90">
+                  What this replaces
+                </div>
                 <ul className="mt-4 space-y-3 text-sm text-white/70">
                   <li>• Front desk / inbound call handling</li>
                   <li>• Manual intake + “what was your name again?”</li>
@@ -371,30 +379,56 @@ export default function PhoneSystemMarketingPage() {
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-6">
-                <div className="text-sm font-semibold text-white/90">Cora can:</div>
+                <div className="text-sm font-semibold text-white/90">
+                  Cora can:
+                </div>
                 <ul className="mt-4 space-y-3 text-sm text-white/70">
-                  <li>• Answer instantly + detect intent (quote, service, billing, claims)</li>
+                  <li>
+                    • Answer instantly + detect intent (quote, service, billing,
+                    claims)
+                  </li>
                   <li>• Gather structured info + log summaries automatically</li>
                   <li>• Transfer & screen calls (“who is calling and why?”)</li>
                   <li>• Schedule appointments + send confirmations</li>
-                  <li className="text-white/85 font-semibold">• Remember callers (continuity on repeat calls)</li>
+                  <li className="text-white/85 font-semibold">
+                    • Remember callers (continuity on repeat calls)
+                  </li>
                 </ul>
               </div>
             </div>
 
             {/* How it works */}
             <section className="mt-14">
-              <h2 className="text-2xl font-bold tracking-tight">Setup is stupid simple</h2>
+              <h2 className="text-2xl font-bold tracking-tight">
+                Setup is stupid simple
+              </h2>
               <p className="mt-2 text-white/70 max-w-3xl">
-                You don’t need to be technical. You configure your AI employee like you would onboard a real one.
+                You don’t need to be technical. You configure your AI employee
+                like you would onboard a real one.
               </p>
 
               <div className="mt-6 grid gap-4 md:grid-cols-4">
                 {[
-                  { n: "1", t: "Name & Voice", d: "Keep defaults or rename + choose a voice." },
-                  { n: "2", t: "Greeting & Hours", d: "Business-hours and after-hours behavior." },
-                  { n: "3", t: "Knowledge Base", d: "FAQs, services, what you do and don’t do." },
-                  { n: "4", t: "Transfers & Booking", d: "Who gets what calls, and calendar booking rules." },
+                  {
+                    n: "1",
+                    t: "Name & Voice",
+                    d: "Keep defaults or rename + choose a voice.",
+                  },
+                  {
+                    n: "2",
+                    t: "Greeting & Hours",
+                    d: "Business-hours and after-hours behavior.",
+                  },
+                  {
+                    n: "3",
+                    t: "Knowledge Base",
+                    d: "FAQs, services, what you do and don’t do.",
+                  },
+                  {
+                    n: "4",
+                    t: "Transfers & Booking",
+                    d: "Who gets what calls, and calendar booking rules.",
+                  },
                 ].map((x) => (
                   <div
                     key={x.n}
@@ -409,10 +443,10 @@ export default function PhoneSystemMarketingPage() {
 
               <div className="mt-8 flex flex-col sm:flex-row gap-3">
                 <Link
-                  to="/onboarding/1"
+                  to="/pricing?trial=1"
                   className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-white/90"
                 >
-                  Start for $1
+                  Click Start
                 </Link>
                 <Link
                   to="/pricing"
@@ -445,127 +479,142 @@ export default function PhoneSystemMarketingPage() {
         title="Meet Cora — Inbound Call Coordinator"
         onClose={() => setCoraOpen(false)}
       >
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-orange-400 to-purple-500" />
-              <div className="leading-tight">
-                <div className="text-sm font-semibold text-white/90">Cora</div>
-                <div className="text-xs text-white/60">
-                  Inbound Call Coordinator • (Name editable anytime)
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-              <div className="relative aspect-[9/16]">
-                <video
-                  ref={coraVidRef}
-                  src={CORA_VIDEO_URL}
-                  className="absolute inset-0 h-full w-full object-contain bg-black"
-                  playsInline
-                  autoPlay
-                  muted={coraMuted}
-                  preload="metadata"
-                  onClick={() => setCoraMuted((v) => !v)}
-                  onEnded={() => setCoraPaused(true)}
-                />
-
-                {/* subtle “lives in UI” gradient */}
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
-
-                {/* custom controls (no ugly player chrome) */}
-                <div className="absolute top-3 right-3 flex items-center gap-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const v = coraVidRef.current;
-                      if (!v) return;
-                      if (v.paused) {
-                        v.play();
-                        setCoraPaused(false);
-                      } else {
-                        v.pause();
-                        setCoraPaused(true);
-                      }
-                    }}
-                    className="text-[11px] px-2 py-1 rounded-full border border-white/10 text-white/80 bg-black/40 backdrop-blur hover:border-white/25"
-                    title={coraPaused ? "Play" : "Pause"}
-                  >
-                    {coraPaused ? "Play" : "Pause"}
-                  </button>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCoraMuted((v) => !v);
-                    }}
-                    className="text-[11px] px-2 py-1 rounded-full border border-white/10 text-white/80 bg-black/40 backdrop-blur hover:border-white/25"
-                    title={coraMuted ? "Unmute" : "Mute"}
-                  >
-                    {coraMuted ? "Sound: Off" : "Sound: On"}
-                  </button>
-                </div>
-
-                {/* hint text */}
-                <div className="pointer-events-none absolute bottom-3 left-3 right-3">
-                  <div className="rounded-xl border border-white/10 bg-black/35 backdrop-blur px-3 py-2 text-sm text-white/90">
-                    Tap video to toggle sound
+        {/* IMPORTANT: pb-28 so content doesn't hide under the sticky footer */}
+        <div className="pb-28">
+          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            {/* Left: Cora video card */}
+            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-orange-400 to-purple-500" />
+                <div className="leading-tight">
+                  <div className="text-sm font-semibold text-white/90">Cora</div>
+                  <div className="text-xs text-white/60">
+                    Inbound Call Coordinator • (Name editable anytime)
                   </div>
                 </div>
               </div>
+
+              <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
+                <div className="relative aspect-[9/16]">
+                  <video
+                    ref={coraVidRef}
+                    src={CORA_VIDEO_URL}
+                    className="absolute inset-0 h-full w-full object-contain bg-black"
+                    playsInline
+                    autoPlay
+                    muted={coraMuted}
+                    preload="metadata"
+                    onClick={() => setCoraMuted((v) => !v)}
+                    onEnded={() => setCoraPaused(true)}
+                  />
+
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+
+                  {/* custom controls */}
+                  <div className="absolute top-3 right-3 flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const v = coraVidRef.current;
+                        if (!v) return;
+                        if (v.paused) {
+                          v.play();
+                          setCoraPaused(false);
+                        } else {
+                          v.pause();
+                          setCoraPaused(true);
+                        }
+                      }}
+                      className="text-[11px] px-2 py-1 rounded-full border border-white/10 text-white/80 bg-black/40 backdrop-blur hover:border-white/25"
+                      title={coraPaused ? "Play" : "Pause"}
+                    >
+                      {coraPaused ? "Play" : "Pause"}
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCoraMuted((v) => !v);
+                      }}
+                      className="text-[11px] px-2 py-1 rounded-full border border-white/10 text-white/80 bg-black/40 backdrop-blur hover:border-white/25"
+                      title={coraMuted ? "Unmute" : "Mute"}
+                    >
+                      {coraMuted ? "Sound: Off" : "Sound: On"}
+                    </button>
+                  </div>
+
+                  <div className="pointer-events-none absolute bottom-3 left-3 right-3">
+                    <div className="rounded-xl border border-white/10 bg-black/35 backdrop-blur px-3 py-2 text-sm text-white/90">
+                      Tap video to toggle sound
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* NOTE: CTAs removed from here — they're now sticky at the bottom */}
             </div>
-            <div className="mt-5 flex flex-col sm:flex-row gap-3">
+
+            {/* Right: info cards */}
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
+                <div className="text-sm font-semibold">The HR pain Cora deletes</div>
+                <ul className="mt-3 space-y-2 text-sm text-white/70">
+                  <li>• Wages + payroll tax + workers comp</li>
+                  <li>• Call-outs, turnover, training cycles</li>
+                  <li>• Interruptions that kill producer productivity</li>
+                  <li>• Inconsistent call handling quality</li>
+                </ul>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
+                <div className="text-sm font-semibold">What Cora handles</div>
+                <ul className="mt-3 space-y-2 text-sm text-white/70">
+                  <li>• Detect intent: quote, service, billing, claims</li>
+                  <li>• Gather structured info + log summaries</li>
+                  <li>• Answer FAQs from your knowledge base</li>
+                  <li>• Screen + transfer calls</li>
+                  <li>• Book appointments + confirmations</li>
+                  <li className="text-white/85 font-semibold">
+                    • Remember callers and continue where you left off
+                  </li>
+                </ul>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
+                <div className="text-sm font-semibold">Setup (minutes, not weeks)</div>
+                <ul className="mt-3 space-y-2 text-sm text-white/70">
+                  <li>• Name + voice</li>
+                  <li>• Greeting + business hours</li>
+                  <li>• Transfer targets + calendars</li>
+                  <li>• Knowledge base</li>
+                  <li>• Go live</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sticky CTA Footer (always visible) */}
+        <div className="sticky bottom-0 -mx-6 border-t border-white/10 bg-[#0a0a12]/85 backdrop-blur px-6 py-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
               <Link
-                to="/onboarding/1"
+                to="/pricing?trial=1"
                 className="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-500 to-orange-400 px-5 py-3 text-sm font-semibold text-white hover:from-purple-600 hover:to-orange-500"
               >
-                Start for $1
+                Click Start
               </Link>
 
               <Link
                 to="/pricing"
-                className="inline-flex items-center justify-center rounded-xl border border-white/15 px-5 py-3 text-sm font-semibold text-white/90 hover:border-white/30"
+                className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white/90 hover:bg-white/10"
               >
                 View Pricing
               </Link>
             </div>
-          </div>
 
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
-              <div className="text-sm font-semibold">The HR pain Cora deletes</div>
-              <ul className="mt-3 space-y-2 text-sm text-white/70">
-                <li>• Wages + payroll tax + workers comp</li>
-                <li>• Call-outs, turnover, training cycles</li>
-                <li>• Interruptions that kill producer productivity</li>
-                <li>• Inconsistent call handling quality</li>
-              </ul>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
-              <div className="text-sm font-semibold">What Cora handles</div>
-              <ul className="mt-3 space-y-2 text-sm text-white/70">
-                <li>• Detect intent: quote, service, billing, claims</li>
-                <li>• Gather structured info + log summaries</li>
-                <li>• Answer FAQs from your knowledge base</li>
-                <li>• Screen + transfer calls</li>
-                <li>• Book appointments + confirmations</li>
-                <li className="text-white/85 font-semibold">
-                  • Remember callers and continue where you left off
-                </li>
-              </ul>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
-              <div className="text-sm font-semibold">Setup (minutes, not weeks)</div>
-              <ul className="mt-3 space-y-2 text-sm text-white/70">
-                <li>• Name + voice</li>
-                <li>• Greeting + business hours</li>
-                <li>• Transfer targets + calendars</li>
-                <li>• Knowledge base</li>
-                <li>• Go live</li>
-              </ul>
+            <div className="text-xs text-white/60">
+              Pick your plan now — trial is $1 for 14 days.
             </div>
           </div>
         </div>
