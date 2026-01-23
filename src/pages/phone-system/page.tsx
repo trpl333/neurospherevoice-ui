@@ -266,7 +266,7 @@ export default function PhoneSystemMarketingPage() {
                   className={[
                     "rounded-xl bg-gradient-to-r from-purple-500 to-orange-400 px-5 py-3 text-sm font-semibold text-white hover:from-purple-600 hover:to-orange-500 transition-all duration-300",
                     highlightMeetCora
-                      ? "ring-4 ring-orange-300/40 shadow-[0_0_40px_rgba(255,106,0,0.35)] animate-pulse"
+                      ? "ring-8 ring-orange-300/70 shadow-[0_0_80px_rgba(255,106,0,0.65)] animate-[pulse_1.2s_ease-in-out_infinite]"
                       : "",
                   ].join(" ")}
                 >
