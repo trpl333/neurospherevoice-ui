@@ -53,13 +53,31 @@ function MorganGuidePanel({
   onCueMeetCora: () => void;
   onMeetCora: () => void;
 }) {
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [paused, setPaused] = useState(false);
   const vidRef = useRef<HTMLVideoElement | null>(null);
   const hasCuedRef = useRef(false);
 
   const MORGAN_VIDEO_URL =
     "https://personal-sam-artifacts.sfo3.cdn.digitaloceanspaces.com/Neurosphere%20Folder/Videos/Avatars/morgan_phone_system_intro_v1.mp4.mp4";
+  useEffect(() => {
+    const v = vidRef.current;
+    if (!v) return;
+
+    // try to start WITH sound
+    v.muted = false;
+    setMuted(false);
+
+    const p = v.play();
+    if (p && typeof p.catch === "function") {
+     p.catch(() => {
+        // browser blocked autoplay-with-sound → fallback to muted autoplay
+        v.muted = true;
+        setMuted(true);
+        v.play().catch(() => {});
+      });
+    }
+  }, []);
 
   return (
     <aside className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
