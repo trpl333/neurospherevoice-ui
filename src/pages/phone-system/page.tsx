@@ -217,7 +217,7 @@ export default function PhoneSystemMarketingPage() {
   const hasCuedStartRef = useRef(false);
 
   // Adjust this to the exact moment in your Cora video when she says "click start"
-  const CORA_START_CUE_SECONDS = 18;
+  const CORA_START_CUE_SECONDS = 50;
 
   const CORA_VIDEO_URL =
     "https://personal-sam-artifacts.sfo3.cdn.digitaloceanspaces.com/Neurosphere%20Folder/Videos/Avatars/Meet%20Cora%20(1).mp4";
