@@ -175,6 +175,9 @@ export default function PhoneSystemMarketingPage() {
 
   const [coraOpen, setCoraOpen] = useState(false);
   const [highlightMeetCora, setHighlightMeetCora] = useState(false);
+  const [coraMuted, setCoraMuted] = useState(true);
+  const [coraPaused, setCoraPaused] = useState(false);
+  const coraVidRef = useRef<HTMLVideoElement | null>(null);
 
   const CORA_VIDEO_URL =
     "https://personal-sam-artifacts.sfo3.cdn.digitaloceanspaces.com/Neurosphere%20Folder/Videos/Avatars/Meet%20Cora%20(1).mp4";
