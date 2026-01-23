@@ -415,18 +415,63 @@ export default function PhoneSystemMarketingPage() {
             </div>
 
             <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-              <div className="relative aspect-video">
+              <div className="relative aspect-[9/16]">
                 <video
+                  ref={coraVidRef}
                   src={CORA_VIDEO_URL}
                   className="absolute inset-0 h-full w-full object-contain bg-black"
                   playsInline
-                  controls
+                  autoPlay
+                  muted={coraMuted}
                   preload="metadata"
+                  onClick={() => setCoraMuted((v) => !v)}
+                  onEnded={() => setCoraPaused(true)}
                 />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+
+                {/* subtle “lives in UI” gradient */}
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+
+                {/* custom controls (no ugly player chrome) */}
+                <div className="absolute top-3 right-3 flex items-center gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const v = coraVidRef.current;
+                      if (!v) return;
+                      if (v.paused) {
+                        v.play();
+                        setCoraPaused(false);
+                      } else {
+                        v.pause();
+                        setCoraPaused(true);
+                      }
+                    }}
+                    className="text-[11px] px-2 py-1 rounded-full border border-white/10 text-white/80 bg-black/40 backdrop-blur hover:border-white/25"
+                    title={coraPaused ? "Play" : "Pause"}
+                  >
+                    {coraPaused ? "Play" : "Pause"}
+                  </button>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCoraMuted((v) => !v);
+                    }}
+                    className="text-[11px] px-2 py-1 rounded-full border border-white/10 text-white/80 bg-black/40 backdrop-blur hover:border-white/25"
+                    title={coraMuted ? "Unmute" : "Mute"}
+                  >
+                    {coraMuted ? "Sound: Off" : "Sound: On"}
+                  </button>
+                </div>
+
+                {/* hint text */}
+                <div className="pointer-events-none absolute bottom-3 left-3 right-3">
+                  <div className="rounded-xl border border-white/10 bg-black/35 backdrop-blur px-3 py-2 text-sm text-white/90">
+                    Tap video to toggle sound
+                  </div>
+                </div>
               </div>
             </div>
-
             <div className="mt-5 flex flex-col sm:flex-row gap-3">
               <Link
                 to="/onboarding/1"
