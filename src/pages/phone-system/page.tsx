@@ -30,7 +30,7 @@ function Modal({
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="relative w-full max-w-5xl rounded-2xl border border-white/10 bg-[#0a0a12] shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-5xl max-h-[calc(100vh-3rem)] rounded-2xl border border-white/10 bg-[#0a0a12] shadow-2xl overflow-hidden flex flex-col">
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
           <div className="font-semibold">{title}</div>
           <button
