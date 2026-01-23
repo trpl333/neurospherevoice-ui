@@ -103,7 +103,7 @@ function MorganGuidePanel({
       {/* Video container */}
       <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
         {/* If Morgan is portrait, change aspect-video to aspect-[9/16] */}
-        <div className="relative aspect-video">
+        <div className="relative aspect-[9/16]">
           <video
             src={MORGAN_VIDEO_URL}
             className="absolute inset-0 h-full w-full object-cover"
