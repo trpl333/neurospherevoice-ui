@@ -155,7 +155,8 @@ export default function PhoneSystemMarketingPage() {
 
   // Cora (public Spaces URL)
   const CORA_VIDEO_URL =
-    "https://personal-sam-artifacts.sfo3.cdn.digitaloceanspaces.com/Neurosphere%20Folder/Videos/Avatars/Meet%20Cora.mp4";
+    "const CORA_VIDEO_URL =
+       "https://personal-sam-artifacts.sfo3.cdn.digitaloceanspaces.com/Neurosphere%20Folder/Videos/Avatars/Meet%20Cora%20(1).mp4";
 
   // Auto-remove highlight after a bit (so it doesn’t pulse forever)
   useEffect(() => {
