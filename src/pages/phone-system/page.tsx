@@ -392,7 +392,7 @@ export default function PhoneSystemMarketingPage() {
               <div className="relative aspect-video">
                 <video
                   src={CORA_VIDEO_URL}
-                  className="absolute inset-0 h-full w-full object-cover"
+                  className="absolute inset-0 h-full w-full object-contain bg-black"
                   playsInline
                   controls
                   preload="metadata"
