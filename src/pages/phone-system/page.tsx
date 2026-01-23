@@ -54,11 +54,10 @@ function MorganGuidePanel({
   onMeetCora: () => void;
 }) {
   const [muted, setMuted] = useState(true);
-  const hasCuedRef = useRef(false);
-  const vidRef = useRef<HTMLVideoElement | null>(null);
   const [paused, setPaused] = useState(false);
+  const vidRef = useRef<HTMLVideoElement | null>(null);
+  const hasCuedRef = useRef(false);
 
-  // Morgan (public Spaces URL)
   const MORGAN_VIDEO_URL =
     "https://personal-sam-artifacts.sfo3.cdn.digitaloceanspaces.com/Neurosphere%20Folder/Videos/Avatars/morgan_phone_system_intro_v1.mp4.mp4";
 
@@ -76,18 +75,37 @@ function MorganGuidePanel({
           </div>
         </div>
 
-        <button
-          onClick={() => setMuted((v) => !v)}
-          className="text-[11px] px-2 py-1 rounded-full border border-white/10 text-white/70 hover:border-white/25"
-          title={muted ? "Unmute" : "Mute"}
-        >
-          {muted ? "Sound: Off" : "Sound: On"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const v = vidRef.current;
+              if (!v) return;
+              if (v.paused) {
+                v.play();
+                setPaused(false);
+              } else {
+                v.pause();
+                setPaused(true);
+              }
+            }}
+            className="text-[11px] px-2 py-1 rounded-full border border-white/10 text-white/70 hover:border-white/25"
+            title={paused ? "Play" : "Pause"}
+          >
+            {paused ? "Play" : "Pause"}
+          </button>
+
+          <button
+            onClick={() => setMuted((v) => !v)}
+            className="text-[11px] px-2 py-1 rounded-full border border-white/10 text-white/70 hover:border-white/25"
+            title={muted ? "Unmute" : "Mute"}
+          >
+            {muted ? "Sound: Off" : "Sound: On"}
+          </button>
+        </div>
       </div>
 
-      {/* Video - “lives in page” (no player controls) */}
+      {/* Video - “lives in page” (no player controls, no loop) */}
       <div className="mt-4 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-        {/* Morgan is portrait: 9:16 */}
         <div className="relative aspect-[9/16]">
           <video
             ref={vidRef}
@@ -95,23 +113,20 @@ function MorganGuidePanel({
             className="absolute inset-0 h-full w-full object-cover"
             playsInline
             autoPlay
-            loop
             muted={muted}
             preload="metadata"
             onClick={() => setMuted((v) => !v)}
+            onEnded={() => setPaused(true)}
             onTimeUpdate={(e) => {
-              // Morgan says “click Meet Cora” around 32s
               const t = e.currentTarget.currentTime;
+              // Cue the glow when Morgan says “click Meet Cora” (~32s)
               if (!hasCuedRef.current && t >= 32) {
                 hasCuedRef.current = true;
                 onCueMeetCora();
               }
             }}
           />
-          {/* subtle overlay to blend into UI */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-
-          {/* tiny hint pill */}
           <div className="pointer-events-none absolute bottom-3 left-3 right-3">
             <div className="rounded-xl border border-white/10 bg-black/35 backdrop-blur px-3 py-2 text-sm text-white/90">
               Tap video to toggle sound
@@ -123,7 +138,15 @@ function MorganGuidePanel({
       {/* CTAs */}
       <div className="mt-4 grid grid-cols-2 gap-3">
         <button
-          onClick={onMeetCora}
+          onClick={() => {
+            // Auto-pause Morgan when opening Cora
+            const v = vidRef.current;
+            if (v && !v.paused) {
+              v.pause();
+              setPaused(true);
+            }
+            onMeetCora();
+          }}
           className="rounded-xl bg-gradient-to-r from-purple-500 to-orange-400 px-4 py-3 text-sm font-semibold text-white hover:from-purple-600 hover:to-orange-500"
         >
           Meet Cora
@@ -153,12 +176,10 @@ export default function PhoneSystemMarketingPage() {
   const [coraOpen, setCoraOpen] = useState(false);
   const [highlightMeetCora, setHighlightMeetCora] = useState(false);
 
-  // Cora (public Spaces URL)
   const CORA_VIDEO_URL =
-    "const CORA_VIDEO_URL =
-       "https://personal-sam-artifacts.sfo3.cdn.digitaloceanspaces.com/Neurosphere%20Folder/Videos/Avatars/Meet%20Cora%20(1).mp4";
+    "https://personal-sam-artifacts.sfo3.cdn.digitaloceanspaces.com/Neurosphere%20Folder/Videos/Avatars/Meet%20Cora%20(1).mp4";
 
-  // Auto-remove highlight after a bit (so it doesn’t pulse forever)
+  // turn off highlight after 12s
   useEffect(() => {
     if (!highlightMeetCora) return;
     const t = window.setTimeout(() => setHighlightMeetCora(false), 12000);
@@ -250,7 +271,6 @@ export default function PhoneSystemMarketingPage() {
             {/* Primary CTAs */}
             <div className="mt-7 flex flex-col sm:flex-row gap-3 items-start">
               <div className="relative">
-                {/* Arrow + label when Morgan cues it */}
                 {highlightMeetCora && (
                   <div className="absolute -top-12 left-0 flex items-center gap-2 animate-bounce">
                     <div className="rounded-xl border border-orange-300/40 bg-black/55 backdrop-blur px-3 py-2 text-xs font-semibold text-white">
@@ -258,7 +278,7 @@ export default function PhoneSystemMarketingPage() {
                     </div>
                   </div>
                 )}
-                
+
                 <button
                   onClick={() => {
                     setCoraOpen(true);
@@ -356,14 +376,14 @@ export default function PhoneSystemMarketingPage() {
             </section>
           </div>
 
-          {/* Right rail: Morgan “lives here” panel */}
+          {/* Right rail */}
           <div className="lg:sticky lg:top-24">
             <MorganGuidePanel
+              onCueMeetCora={() => setHighlightMeetCora(true)}
               onMeetCora={() => {
                 setCoraOpen(true);
                 setHighlightMeetCora(false);
               }}
-              onCueMeetCora={() => setHighlightMeetCora(true)}
             />
           </div>
         </div>
@@ -376,7 +396,6 @@ export default function PhoneSystemMarketingPage() {
         onClose={() => setCoraOpen(false)}
       >
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          {/* Video */}
           <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-orange-400 to-purple-500" />
@@ -418,7 +437,6 @@ export default function PhoneSystemMarketingPage() {
             </div>
           </div>
 
-          {/* Explainer bullets */}
           <div className="space-y-4">
             <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5">
               <div className="text-sm font-semibold">The HR pain Cora deletes</div>
