@@ -55,6 +55,8 @@ function MorganGuidePanel({
 }) {
   const [muted, setMuted] = useState(true);
   const hasCuedRef = useRef(false);
+  const vidRef = useRef<HTMLVideoElement | null>(null);
+  const [paused, setPaused] = useState(false);
 
   // Morgan (public Spaces URL)
   const MORGAN_VIDEO_URL =
@@ -88,6 +90,7 @@ function MorganGuidePanel({
         {/* Morgan is portrait: 9:16 */}
         <div className="relative aspect-[9/16]">
           <video
+            ref={vidRef}
             src={MORGAN_VIDEO_URL}
             className="absolute inset-0 h-full w-full object-cover"
             playsInline
