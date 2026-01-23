@@ -193,12 +193,37 @@ export default function PhoneSystemMarketingPage() {
 
   const [coraOpen, setCoraOpen] = useState(false);
   const [highlightMeetCora, setHighlightMeetCora] = useState(false);
-  const [coraMuted, setCoraMuted] = useState(true);
+  const [coraMuted, setCoraMuted] = useState(false);
   const [coraPaused, setCoraPaused] = useState(false);
   const coraVidRef = useRef<HTMLVideoElement | null>(null);
 
   const CORA_VIDEO_URL =
     "https://personal-sam-artifacts.sfo3.cdn.digitaloceanspaces.com/Neurosphere%20Folder/Videos/Avatars/Meet%20Cora%20(1).mp4";
+  useEffect(() => {
+    if (!coraOpen) return;
+
+    const v = coraVidRef.current;
+    if (!v) return;
+
+    // reset each time modal opens
+    v.currentTime = 0;
+
+    // try to start WITH sound
+    v.muted = false;
+    setCoraMuted(false);
+    setCoraPaused(false);
+
+  const p = v.play();
+  if (p && typeof p.catch === "function") {
+    p.catch(() => {
+      // fallback to muted if blocked
+      v.muted = true;
+      setCoraMuted(true);
+      v.play().catch(() => {});
+    });
+  }
+}, [coraOpen]);
+
 
   // turn off highlight after 12s
   useEffect(() => {
