@@ -251,13 +251,13 @@ export default function PhoneSystemMarketingPage() {
               <div className="relative">
                 {/* Arrow + label when Morgan cues it */}
                 {highlightMeetCora && (
-                  <div className="absolute -top-10 left-0 flex items-center gap-2">
-                    <div className="rounded-xl border border-white/10 bg-black/35 backdrop-blur px-3 py-2 text-xs font-semibold text-white/90">
+                  <div className="absolute -top-12 left-0 flex items-center gap-2 animate-bounce">
+                    <div className="rounded-xl border border-orange-300/40 bg-black/55 backdrop-blur px-3 py-2 text-xs font-semibold text-white">
                       Click Meet Cora ↓
                     </div>
                   </div>
                 )}
-
+                
                 <button
                   onClick={() => {
                     setCoraOpen(true);
