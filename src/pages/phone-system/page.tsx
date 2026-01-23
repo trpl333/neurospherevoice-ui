@@ -81,8 +81,7 @@ function MorganGuidePanel({
   onMeetCora: () => void;
 }) {
   // ✅ Replace this with your Spaces/CDN URL for Morgan
-  const MORGAN_VIDEO_URL =
-    "https://YOUR_CDN_URL_HERE/morgan_phone_intro_v1.mp4";
+  const MORGAN_VIDEO_URL ="https://personal-sam-artifacts.sfo3.cdn.digitaloceanspaces.com/Neurosphere%20Folder/Videos/Avatars/morgan_phone_system_intro_v1.mp4.mp4";
 
   return (
     <aside className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
