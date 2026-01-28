@@ -359,7 +359,7 @@ export default function Dashboard() {
 
     // 🔥 Save into greeting_template (NOT agent)
     const payload = {
-      greeting_template: {
+      agent: {
         existing: safeExisting || "",
         new: safeNew || ""
       }
