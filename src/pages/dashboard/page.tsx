@@ -183,17 +183,19 @@ export default function Dashboard() {
         // Your original code handled ALL these paths.
         // I preserved them EXACTLY.
         // -------------------------------
-        let parsedGreeting = {};
+        // greeting_template comes back as an OBJECT from ChatStack, not a JSON string.
+        // Use the safest path first (config.greetings), then fall back to templates.
+        const existingGreetingValue =
+          config.greetings?.existing_user_greeting ??
+          config.greeting_template?.existing ??
+          config.phone?.greeting_template?.existing ??
+          "";
 
-        try {
-          parsedGreeting = JSON.parse(config.greeting_template || "{}");
-        } catch (e) {
-          parsedGreeting = {};
-        }
-
-        const existingGreetingValue = parsedGreeting.existing || "";
-        const newCallerGreetingValue = parsedGreeting.new || "";
-
+        const newCallerGreetingValue =
+          config.greetings?.new_caller_greeting ??
+          config.greeting_template?.new ??
+          config.phone?.greeting_template?.new ??
+          "";
 
         setTwilioNumber(config.phone?.twilio_phone_number || '');
         setExistingGreeting(existingGreetingValue);
