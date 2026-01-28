@@ -378,6 +378,7 @@ export default function Dashboard() {
     if (res.ok) {
       setSaveMessage("Greetings saved successfully!");
       setTimeout(() => setSaveMessage(""), 3000);
+      await loadCustomerConfig(); // ✅ pull back what backend actually saved
       // Phone System: leave user’s text visible
     } else {
       console.error("Save failed:", result);
