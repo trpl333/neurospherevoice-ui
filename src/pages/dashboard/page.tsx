@@ -361,9 +361,9 @@ export default function Dashboard() {
     // 🔥 Save into greeting_template (NOT agent)
     const payload = {
       agent: {
-        existing: safeExisting || "",
-        new: safeNew || ""
-      }
+        existing_user_greeting: safeExisting,
+        new_caller_greeting: safeNew,
+      },
     };
 
     const res = await fetch(`${API_BASE}/customers/${customerId}/config`, {
