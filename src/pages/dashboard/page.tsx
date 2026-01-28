@@ -248,6 +248,7 @@ export default function Dashboard() {
       if (res.ok) {
         setSaveMessage('Agent name saved successfully!');
         setTimeout(() => setSaveMessage(''), 3000);
+        await loadCustomerConfig(); 
       } else {
         const errorText = await res.text();
         console.error('Save failed:', res.status, errorText);
