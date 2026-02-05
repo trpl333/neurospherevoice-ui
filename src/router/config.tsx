@@ -9,6 +9,7 @@ import PhoneSystem from "../pages/phone-system/page";
 import Login from "../pages/login/page";
 import PricingPage from "../pages/pricing/page";
 import Register from "../pages/register/page";
+import PersonalityStudio from "../pages/personality-studio/page";
 
 import OnboardingStep1 from "../pages/onboarding/step1";
 import OnboardingStep2 from "../pages/onboarding/step2";
@@ -41,6 +42,10 @@ const routes: RouteObject[] = [
   {
     path: "/user-memories",
     element: <UserMemories />,
+  },
+  {
+    path: "/personality-studio",
+    element: <PersonalityStudio />,
   },
   {
     path: "/home",
