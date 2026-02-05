@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import CoreLayout from "../../components/layout/CoreLayout";
 
 // ✅ Keep same voice options you already use elsewhere (values match backend IDs)
@@ -17,6 +17,7 @@ const VOICE_OPTIONS = [
 ] as const;
 
 type PromptKey = "main" | "mood" | "knowledge" | "safety";
+type PromptMode = "v1" | "v2";
 type SliderKey =
   | "warmth" | "formality" | "humor" | "directness"
   | "empathy" | "confidence" | "curiosity" | "patience"
@@ -26,6 +27,13 @@ type SliderKey =
   | "selfReference" | "topicFocus" | "repetition" | "polish"
   | "intensity" | "caution" | "jargon" | "humorSensitivity"
   | "consistency" | "metaAwareness";
+
+type CustomerConfigResponse = {
+  success?: boolean;
+  prompt_version?: PromptMode;
+  system_prompts?: Record<PromptKey, string>;
+  // other keys exist but we don't need them here yet
+};
 
 const SLIDER_KEYS: SliderKey[] = [
   "warmth","formality","humor","directness",
@@ -124,6 +132,11 @@ const STARTERS: Record<PromptKey, { label: string; value: string }[]> = {
   ],
 };
 
+function getCustomerId(): string | null {
+  // ✅ Works with your earlier patterns; adjust if you store it elsewhere
+  return localStorage.getItem("customerId") || sessionStorage.getItem("customerId");
+}
+
 function Card({
   title,
   icon,
@@ -184,7 +197,7 @@ function Slider({
 }
 
 export default function PersonalityStudioPage() {
-  const [promptMode, setPromptMode] = useState<"v1" | "v2">("v1"); // UI-only for now
+  const [promptMode, setPromptMode] = useState<PromptMode>("v1");
   const [voice, setVoice] = useState<(typeof VOICE_OPTIONS)[number]["value"]>("sol");
 
   const [prompts, setPrompts] = useState<Record<PromptKey, string>>({
@@ -204,6 +217,10 @@ export default function PersonalityStudioPage() {
     neverListMemory: true,
     avoidRepeats: true,
   });
+
+  const [statusMsg, setStatusMsg] = useState<string>("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingConfig, setIsLoadingConfig] = useState(false);
 
   const applyStarter = (key: PromptKey, value: string) => {
     setPrompts((p) => ({ ...p, [key]: value }));
@@ -243,11 +260,157 @@ export default function PersonalityStudioPage() {
     ].join("\n");
   }, [prompts, sliders, preset, memPolicy]);
 
+  const loadConfig = async () => {
+    setIsLoadingConfig(true);
+    setStatusMsg("");
+
+    const customerId = getCustomerId();
+    if (!customerId) {
+      setStatusMsg("❌ No customerId found (local/session storage). Log in again.");
+      setIsLoadingConfig(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/customers/${customerId}/config`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        setStatusMsg(`❌ Failed to load config: HTTP ${res.status} ${txt}`);
+        setIsLoadingConfig(false);
+        return;
+      }
+
+      const data = (await res.json()) as CustomerConfigResponse;
+
+      const pv = (data.prompt_version || "v1") as PromptMode;
+      setPromptMode(pv);
+
+      const sp = data.system_prompts || {};
+      setPrompts({
+        main: sp.main || "",
+        mood: sp.mood || "",
+        knowledge: sp.knowledge || "",
+        safety: sp.safety || "",
+      });
+
+      setStatusMsg("✅ Loaded saved prompts.");
+    } catch (e: any) {
+      setStatusMsg(`❌ Load error: ${e?.message || String(e)}`);
+    } finally {
+      setIsLoadingConfig(false);
+    }
+  };
+
+  const saveDraft = async () => {
+    setIsSaving(true);
+    setStatusMsg("");
+
+    const customerId = getCustomerId();
+    if (!customerId) {
+      setStatusMsg("❌ No customerId found. Log in again.");
+      setIsSaving(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/customers/${customerId}/config`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_prompts: {
+            main: prompts.main,
+            mood: prompts.mood,
+            knowledge: prompts.knowledge,
+            safety: prompts.safety,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        setStatusMsg(`❌ Save Draft failed: HTTP ${res.status} ${txt}`);
+        return;
+      }
+
+      setStatusMsg("✅ Draft saved. (Legacy stays until you Publish.)");
+      await loadConfig();
+    } catch (e: any) {
+      setStatusMsg(`❌ Save error: ${e?.message || String(e)}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const publish = async () => {
+    setIsSaving(true);
+    setStatusMsg("");
+
+    const customerId = getCustomerId();
+    if (!customerId) {
+      setStatusMsg("❌ No customerId found. Log in again.");
+      setIsSaving(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/customers/${customerId}/config`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt_version: "v2",
+          system_prompts: {
+            main: prompts.main,
+            mood: prompts.mood,
+            knowledge: prompts.knowledge,
+            safety: prompts.safety,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        setStatusMsg(`❌ Publish failed: HTTP ${res.status} ${txt}`);
+        return;
+      }
+
+      setStatusMsg("🔥 Published. New calls will use Personality Studio (v2).");
+      await loadConfig();
+    } catch (e: any) {
+      setStatusMsg(`❌ Publish error: ${e?.message || String(e)}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    // Load saved data when page opens
+    loadConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const statusBg =
+    statusMsg.startsWith("❌") ? "rgba(239,68,68,0.2)" :
+    statusMsg.startsWith("🔥") ? "rgba(249,115,22,0.2)" :
+    statusMsg.startsWith("✅") ? "rgba(34,197,94,0.2)" :
+    "rgba(255,255,255,0.03)";
+
+  const statusColor =
+    statusMsg.startsWith("❌") ? "#fca5a5" :
+    statusMsg.startsWith("🔥") ? "#fdba74" :
+    statusMsg.startsWith("✅") ? "#86efac" :
+    "#d1d5db";
+
   return (
     <CoreLayout>
       <div className="p-8">
         {/* Header */}
-        <div className="mb-8 flex items-start justify-between gap-6">
+        <div className="mb-6 flex items-start justify-between gap-6">
           <div>
             <h1
               className="text-4xl font-bold mb-2"
@@ -261,7 +424,7 @@ export default function PersonalityStudioPage() {
               PERSONALITY STUDIO
             </h1>
             <p className="text-gray-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              Design your agent’s prompts and personality. (UI-only for now — wiring comes next.)
+              System prompts are now editable and saveable. Sliders wiring comes next.
             </p>
           </div>
 
@@ -283,27 +446,58 @@ export default function PersonalityStudioPage() {
                 background: "rgba(255,255,255,0.03)",
                 border: "1px solid rgba(138, 43, 226, 0.2)",
                 color: "#aaaaaa",
+                opacity: isLoadingConfig ? 0.6 : 1,
               }}
-              onClick={() => setPromptMode((m) => (m === "v1" ? "v2" : "v1"))}
-              title="UI-only toggle (wiring later)"
+              onClick={loadConfig}
+              disabled={isLoadingConfig}
+              title="Reload from server"
             >
-              Toggle v1/v2
+              {isLoadingConfig ? "Loading…" : "Reload"}
+            </button>
+
+            <button
+              className="px-4 py-2 rounded-lg text-sm font-semibold"
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(138, 43, 226, 0.2)",
+                color: "#aaaaaa",
+                opacity: isSaving ? 0.6 : 1,
+              }}
+              onClick={saveDraft}
+              disabled={isSaving}
+              title="Save prompts without switching to v2"
+            >
+              {isSaving ? "Saving…" : "Save Draft"}
             </button>
 
             <button
               className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
               style={{
                 background: "linear-gradient(90deg, #8a2be2, #ff6a00)",
-                opacity: 0.7,
-                cursor: "not-allowed",
+                opacity: isSaving ? 0.6 : 1,
               }}
-              disabled
-              title="We’ll wire this after the UI is approved"
+              onClick={publish}
+              disabled={isSaving}
+              title="Save and activate v2 for calls"
             >
-              Publish
+              {isSaving ? "Publishing…" : "Publish"}
             </button>
           </div>
         </div>
+
+        {/* Status */}
+        {statusMsg && (
+          <div
+            className="max-w-6xl mx-auto mb-6 p-4 rounded-lg"
+            style={{
+              background: statusBg,
+              border: "1px solid rgba(138,43,226,0.15)",
+              color: statusColor,
+            }}
+          >
+            {statusMsg}
+          </div>
+        )}
 
         {/* System Prompts */}
         <div className="max-w-6xl mx-auto space-y-6">
@@ -334,7 +528,7 @@ export default function PersonalityStudioPage() {
                 <button
                   className="flex-1 px-4 py-2 rounded-lg text-white font-semibold"
                   style={{ background: "rgba(138, 43, 226, 0.25)", border: "1px solid rgba(138, 43, 226, 0.35)" }}
-                  onClick={() => alert("AI Generate will be wired later (4o-mini).")}
+                  onClick={() => alert("AI Generate will be wired next (4o-mini).")}
                 >
                   ✨ AI Generate
                 </button>
@@ -374,7 +568,7 @@ export default function PersonalityStudioPage() {
                 <button
                   className="flex-1 px-4 py-2 rounded-lg text-white font-semibold"
                   style={{ background: "rgba(138, 43, 226, 0.25)", border: "1px solid rgba(138, 43, 226, 0.35)" }}
-                  onClick={() => alert("AI Generate will be wired later (4o-mini).")}
+                  onClick={() => alert("AI Generate will be wired next (4o-mini).")}
                 >
                   ✨ AI Generate
                 </button>
@@ -439,8 +633,8 @@ export default function PersonalityStudioPage() {
             </Card>
           </div>
 
-          {/* Personality */}
-          <Card title="Personality Presets & Sliders" icon="ri-sliders-line">
+          {/* Personality (still UI-only for now) */}
+          <Card title="Personality Presets & Sliders (UI-only for now)" icon="ri-sliders-line">
             <div className="flex flex-wrap gap-2 mb-5">
               {[
                 ["professional", "👔 Professional"],
@@ -511,7 +705,7 @@ export default function PersonalityStudioPage() {
 
           {/* Voice + Memory + Preview */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card title="Voice Selection" icon="ri-mic-line">
+            <Card title="Voice Selection (UI-only for now)" icon="ri-mic-line">
               <label className="block text-sm text-purple-300 mb-2">OpenAI Voice</label>
               <select
                 className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white"
@@ -524,33 +718,46 @@ export default function PersonalityStudioPage() {
                   </option>
                 ))}
               </select>
-
-              <div className="text-xs text-gray-400 mt-2">
-                (Wiring later: this will save to customer config and apply on next call.)
-              </div>
+              <div className="text-xs text-gray-400 mt-2">(We’ll wire voice saving next.)</div>
             </Card>
 
-            <Card title="Memory Behavior" icon="ri-brain-2-line">
+            <Card title="Memory Behavior (UI-only for now)" icon="ri-brain-2-line">
               <label className="flex items-center gap-2 text-sm text-gray-200">
-                <input type="checkbox" checked={memPolicy.useName} onChange={(e) => setMemPolicy((m) => ({ ...m, useName: e.target.checked }))} />
+                <input
+                  type="checkbox"
+                  checked={memPolicy.useName}
+                  onChange={(e) => setMemPolicy((m) => ({ ...m, useName: e.target.checked }))}
+                />
                 Use caller name when confident
               </label>
               <label className="flex items-center gap-2 text-sm text-gray-200 mt-2">
-                <input type="checkbox" checked={memPolicy.referenceNaturally} onChange={(e) => setMemPolicy((m) => ({ ...m, referenceNaturally: e.target.checked }))} />
+                <input
+                  type="checkbox"
+                  checked={memPolicy.referenceNaturally}
+                  onChange={(e) => setMemPolicy((m) => ({ ...m, referenceNaturally: e.target.checked }))}
+                />
                 Reference past conversations naturally
               </label>
               <label className="flex items-center gap-2 text-sm text-gray-200 mt-2">
-                <input type="checkbox" checked={memPolicy.neverListMemory} onChange={(e) => setMemPolicy((m) => ({ ...m, neverListMemory: e.target.checked }))} />
+                <input
+                  type="checkbox"
+                  checked={memPolicy.neverListMemory}
+                  onChange={(e) => setMemPolicy((m) => ({ ...m, neverListMemory: e.target.checked }))}
+                />
                 Never list memories explicitly
               </label>
               <label className="flex items-center gap-2 text-sm text-gray-200 mt-2">
-                <input type="checkbox" checked={memPolicy.avoidRepeats} onChange={(e) => setMemPolicy((m) => ({ ...m, avoidRepeats: e.target.checked }))} />
+                <input
+                  type="checkbox"
+                  checked={memPolicy.avoidRepeats}
+                  onChange={(e) => setMemPolicy((m) => ({ ...m, avoidRepeats: e.target.checked }))}
+                />
                 Avoid repeating known facts
               </label>
             </Card>
           </div>
 
-          <Card title="Preview (UI-only)" icon="ri-eye-line">
+          <Card title="Preview" icon="ri-eye-line">
             <pre
               className="w-full p-4 rounded-lg text-xs overflow-auto"
               style={{
