@@ -8,7 +8,7 @@ interface CoreLayoutProps {
 const menuItems = [
   { icon: 'ri-dashboard-line', label: 'Dashboard', path: '/dashboard' },
   { icon: 'ri-phone-line', label: 'Phone System', path: '/phone-system' },
-  { icon: 'ri-brain-line', label: 'AI Settings', path: '/ai-settings' },
+  { icon: 'ri-brain-line', label: 'Personality Studio', path: '/personality-studio' },
   { icon: 'ri-user-line', label: 'User Memories', path: '/user-memories' },
   { icon: 'ri-book-line', label: 'Knowledge Base', path: '/knowledge-base' },
   { icon: 'ri-satellite-line', label: 'System Status', path: '/system-status' },
