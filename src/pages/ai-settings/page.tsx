@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import CoreLayout from "../../components/layout/CoreLayout";
 
 // -----------------------------------------------------------------------------
@@ -9,42 +9,80 @@ const API_BASE =
 
 // Clean American-friendly voice names (values stay the same)
 const VOICE_OPTIONS = [
-  { value: "alloy", label: "Alexa" },
-  { value: "echo", label: "Jordan" },
-  { value: "shimmer", label: "Megan" },
+  { value: "alloy", label: "Alloy" },
+  { value: "echo", label: "Echo" },
+  { value: "shimmer", label: "Shimmer" },
+  { value: "ash", label: "Michael (ash)" },
+  { value: "ballad", label: "Ballad" },
+  { value: "coral", label: "Coral" },
+  { value: "sage", label: "Sage" },
+  { value: "verse", label: "Verse" },
+  { value: "cedar", label: "Cedar" },
+  { value: "marin", label: "Marin" },
+  { value: "sol", label: "Sol" },
+] as const;
 
-  { value: "ash", label: "Michael" },
-  { value: "ballad", label: "Emily" },
-  { value: "coral", label: "Rachel" },
-  { value: "sage", label: "Daniel" },
-  { value: "verse", label: "Olivia" },
+type VoiceValue = (typeof VOICE_OPTIONS)[number]["value"];
 
-  { value: "cedar", label: "Kevin" },
-  { value: "marin", label: "Samantha" }, // as requested
-  { value: "sol", label: "Grace" },
-];
+function CardShell({
+  icon,
+  title,
+  children,
+}: {
+  icon: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="p-6 rounded-2xl backdrop-blur-sm"
+      style={{
+        background: "rgba(26, 26, 36, 0.75)",
+        border: "1px solid rgba(138, 43, 226, 0.3)",
+        boxShadow: "0 8px 32px rgba(255, 0, 140, 0.15)",
+      }}
+    >
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-orange-600">
+          <i className={`${icon} text-white text-xl`} />
+        </div>
 
-export default function AgentSetup() {
+        <h2
+          className="text-xl font-semibold text-white"
+          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+        >
+          {title}
+        </h2>
+      </div>
+
+      {children}
+    </div>
+  );
+}
+
+export default function AgentSetupPage() {
   const [agentName, setAgentName] = useState("");
-  const [selectedVoice, setSelectedVoice] = useState("alloy");
-
+  const [selectedVoice, setSelectedVoice] = useState<VoiceValue>("alloy");
   const [twilioNumber, setTwilioNumber] = useState("");
+
   const [existingGreeting, setExistingGreeting] = useState("");
   const [newCallerGreeting, setNewCallerGreeting] = useState("");
 
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [isSavingAgent, setIsSavingAgent] = useState(false);
   const [isSavingVoice, setIsSavingVoice] = useState(false);
-  const [isSavingGreetings, setIsSavingGreetings] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("");
+  const [isSavingNewGreeting, setIsSavingNewGreeting] = useState(false);
+  const [isSavingExistingGreeting, setIsSavingExistingGreeting] = useState(false);
 
-  useEffect(() => {
-    loadCustomerConfig();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [saveMessage, setSaveMessage] = useState("");
 
   const getCustomerId = () =>
     localStorage.getItem("customerId") || sessionStorage.getItem("customerId");
+
+  const flash = (msg: string) => {
+    setSaveMessage(msg);
+    window.setTimeout(() => setSaveMessage(""), 3000);
+  };
 
   const loadCustomerConfig = async () => {
     try {
@@ -60,43 +98,47 @@ export default function AgentSetup() {
         credentials: "include",
       });
 
-      if (res.ok) {
-        const config = await res.json();
-
-        setAgentName(config.agent?.agent_name || "");
-        setSelectedVoice(config.agent?.openai_voice || "alloy");
-
-        // Greetings mapping (support multiple backend shapes)
-        const existingGreetingValue =
-          config.greetings?.existing_user_greeting ??
-          config.greeting_template?.existing ??
-          config.phone?.greeting_template?.existing ??
-          "";
-
-        const newCallerGreetingValue =
-          config.greetings?.new_caller_greeting ??
-          config.greeting_template?.new ??
-          config.phone?.greeting_template?.new ??
-          "";
-
-        setTwilioNumber(config.phone?.twilio_phone_number || "");
-        setExistingGreeting(existingGreetingValue);
-        setNewCallerGreeting(newCallerGreetingValue);
-      } else {
+      if (!res.ok) {
         const errorText = await res.text().catch(() => "");
         console.error("Failed to load config:", res.status, errorText);
+        setIsLoadingConfig(false);
+        return;
       }
+
+      const config = await res.json();
+
+      setAgentName(config.agent?.agent_name || "");
+      setSelectedVoice((config.agent?.openai_voice || "alloy") as VoiceValue);
+
+      // Greetings mapping (support multiple backend shapes)
+      const existingGreetingValue =
+        config.agent?.existing_user_greeting ??
+        config.greetings?.existing_user_greeting ??
+        config.greeting_template?.existing ??
+        config.phone?.greeting_template?.existing ??
+        "";
+
+      const newCallerGreetingValue =
+        config.agent?.new_caller_greeting ??
+        config.greetings?.new_caller_greeting ??
+        config.greeting_template?.new ??
+        config.phone?.greeting_template?.new ??
+        "";
+
+      setTwilioNumber(config.phone?.twilio_phone_number || "");
+      setExistingGreeting(existingGreetingValue);
+      setNewCallerGreeting(newCallerGreetingValue);
     } catch (error) {
-      console.error("Failed to load config:", error);
+      console.error("Failed to load customer config:", error);
     } finally {
       setIsLoadingConfig(false);
     }
   };
 
-  const flash = (msg: string) => {
-    setSaveMessage(msg);
-    window.setTimeout(() => setSaveMessage(""), 3000);
-  };
+  useEffect(() => {
+    loadCustomerConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const saveAgentName = async () => {
     try {
@@ -122,7 +164,7 @@ export default function AgentSetup() {
         flash("✅ Agent name saved!");
         await loadCustomerConfig();
       } else {
-        const errorText = await res.text();
+        const errorText = await res.text().catch(() => "");
         console.error("Save failed:", res.status, errorText);
         setSaveMessage(`Failed to save agent name (Status: ${res.status})`);
       }
@@ -162,7 +204,7 @@ export default function AgentSetup() {
         flash("✅ Voice saved!");
         await loadCustomerConfig();
       } else {
-        const errorText = await res.text();
+        const errorText = await res.text().catch(() => "");
         console.error("Save failed:", res.status, errorText);
         setSaveMessage(`Failed to save voice (Status: ${res.status})`);
       }
@@ -178,9 +220,11 @@ export default function AgentSetup() {
     }
   };
 
-  const saveGreetings = async () => {
+  const saveGreetings = async (which: "new" | "existing") => {
     try {
-      setIsSavingGreetings(true);
+      if (which === "new") setIsSavingNewGreeting(true);
+      else setIsSavingExistingGreeting(true);
+
       setSaveMessage("");
 
       const customerId = getCustomerId();
@@ -189,6 +233,7 @@ export default function AgentSetup() {
         return;
       }
 
+      // Save both fields to keep server state consistent, but the UX is “Save this box”.
       const payload = {
         agent: {
           existing_user_greeting: existingGreeting ?? "",
@@ -204,22 +249,23 @@ export default function AgentSetup() {
       });
 
       if (res.ok) {
-        flash("✅ Greetings saved!");
+        flash(which === "new" ? "✅ New greeting saved!" : "✅ Returning greeting saved!");
         await loadCustomerConfig();
       } else {
         const errorText = await res.text().catch(() => "");
         console.error("Save failed:", res.status, errorText);
-        setSaveMessage(`Failed to save greetings (Status: ${res.status})`);
+        setSaveMessage(`Failed to save greeting (Status: ${res.status})`);
       }
     } catch (error) {
       console.error("Failed to save greetings:", error);
       setSaveMessage(
-        `Error saving greetings: ${
+        `Error saving greeting: ${
           error instanceof Error ? error.message : "Network error"
         }`
       );
     } finally {
-      setIsSavingGreetings(false);
+      if (which === "new") setIsSavingNewGreeting(false);
+      else setIsSavingExistingGreeting(false);
     }
   };
 
@@ -248,7 +294,7 @@ export default function AgentSetup() {
         {/* Save Message */}
         {saveMessage && (
           <div
-            className="max-w-4xl mb-4 p-4 rounded-lg text-center"
+            className="max-w-7xl mb-4 p-4 rounded-lg text-center"
             style={{
               background:
                 saveMessage.includes("Error") || saveMessage.includes("Failed")
@@ -272,165 +318,129 @@ export default function AgentSetup() {
         {isLoadingConfig ? (
           <div className="text-center py-12 text-purple-300">Loading configuration...</div>
         ) : (
-          <div className="max-w-4xl space-y-6">
-            {/* Agent Name */}
-            <div
-              className="p-6 rounded-2xl backdrop-blur-sm"
-              style={{
-                background: "rgba(26, 26, 36, 0.75)",
-                border: "1px solid rgba(138, 43, 226, 0.3)",
-                boxShadow: "0 8px 32px rgba(255, 0, 140, 0.15)",
-              }}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-orange-600">
-                  <i className="ri-robot-line text-white text-xl" />
-                </div>
-
-                <h2 className="text-xl font-semibold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                  Agent Name
-                </h2>
-              </div>
-
-              <div className="space-y-4">
+          <div className="max-w-7xl space-y-6">
+            {/* TOP ROW: Agent Name / Voice / Phone */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Agent Name */}
+              <CardShell icon="ri-robot-line" title="Agent Name">
                 <input
-                  className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white"
+                  type="text"
                   value={agentName}
                   onChange={(e) => setAgentName(e.target.value)}
-                  placeholder="e.g. Samantha"
+                  placeholder="Enter agent name"
+                  className="w-full px-4 py-3 rounded-lg bg-black/40 border border-purple-500/30 text-white focus:outline-none focus:border-purple-500"
                 />
 
                 <button
-                  className="w-full px-4 py-3 rounded-lg text-white font-semibold"
-                  style={{ background: "linear-gradient(90deg, #8a2be2, #ff6a00)", opacity: isSavingAgent ? 0.6 : 1 }}
                   onClick={saveAgentName}
                   disabled={isSavingAgent}
+                  className="mt-4 w-full py-3 rounded-lg font-semibold transition-all"
+                  style={{
+                    background: isSavingAgent
+                      ? "rgba(138, 43, 226, 0.4)"
+                      : "linear-gradient(90deg, #8a2be2, #ff6a00)",
+                    color: "white",
+                    cursor: isSavingAgent ? "not-allowed" : "pointer",
+                  }}
                 >
-                  {isSavingAgent ? "Saving…" : "💾 Save Agent Name"}
+                  {isSavingAgent ? "Saving..." : "💾 Save Agent Name"}
                 </button>
-              </div>
-            </div>
+              </CardShell>
 
-            {/* Voice */}
-            <div
-              className="p-6 rounded-2xl backdrop-blur-sm"
-              style={{
-                background: "rgba(26, 26, 36, 0.75)",
-                border: "1px solid rgba(138, 43, 226, 0.3)",
-                boxShadow: "0 8px 32px rgba(255, 0, 140, 0.15)",
-              }}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-orange-600">
-                  <i className="ri-mic-line text-white text-xl" />
-                </div>
-
-                <h2 className="text-xl font-semibold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                  Voice
-                </h2>
-              </div>
-
-              <div className="space-y-4">
+              {/* Voice */}
+              <CardShell icon="ri-mic-line" title="Voice">
                 <select
-                  className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white"
                   value={selectedVoice}
-                  onChange={(e) => setSelectedVoice(e.target.value)}
+                  onChange={(e) => setSelectedVoice(e.target.value as VoiceValue)}
+                  className="w-full px-4 py-3 rounded-lg bg-black/40 border border-purple-500/30 text-white focus:outline-none focus:border-purple-500"
                 >
                   {VOICE_OPTIONS.map((v) => (
                     <option key={v.value} value={v.value}>
-                      {v.label} ({v.value})
+                      {v.label}
                     </option>
                   ))}
                 </select>
 
                 <button
-                  className="w-full px-4 py-3 rounded-lg text-white font-semibold"
-                  style={{ background: "linear-gradient(90deg, #8a2be2, #ff6a00)", opacity: isSavingVoice ? 0.6 : 1 }}
                   onClick={saveVoiceSelection}
                   disabled={isSavingVoice}
+                  className="mt-4 w-full py-3 rounded-lg font-semibold transition-all"
+                  style={{
+                    background: isSavingVoice
+                      ? "rgba(138, 43, 226, 0.4)"
+                      : "linear-gradient(90deg, #8a2be2, #ff6a00)",
+                    color: "white",
+                    cursor: isSavingVoice ? "not-allowed" : "pointer",
+                  }}
                 >
-                  {isSavingVoice ? "Saving…" : "💾 Save Voice"}
+                  {isSavingVoice ? "Saving..." : "💾 Save Voice"}
                 </button>
-              </div>
+              </CardShell>
+
+              {/* Assigned Phone Number */}
+              <CardShell icon="ri-phone-line" title="Assigned Phone Number">
+                <input
+                  type="text"
+                  value={twilioNumber || "—"}
+                  disabled
+                  className="w-full px-4 py-3 rounded-lg bg-black/30 border border-purple-500/20 text-white/80"
+                />
+
+                <div className="mt-3 text-xs text-gray-400">
+                  (Read-only for now — assignment happens in Twilio / backend.)
+                </div>
+              </CardShell>
             </div>
 
-            {/* Assigned Phone Number */}
-            <div
-              className="p-6 rounded-2xl backdrop-blur-sm"
-              style={{
-                background: "rgba(26, 26, 36, 0.75)",
-                border: "1px solid rgba(138, 43, 226, 0.3)",
-                boxShadow: "0 8px 32px rgba(255, 0, 140, 0.15)",
-              }}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-orange-600">
-                  <i className="ri-phone-line text-white text-xl" />
-                </div>
-
-                <h2 className="text-xl font-semibold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                  Assigned Phone Number
-                </h2>
-              </div>
-
-              <input
-                className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white"
-                value={twilioNumber || "Not assigned"}
-                disabled
-              />
-
-              <div className="text-xs text-gray-400 mt-2">
-                (Read-only for now — assignment happens in Twilio / backend.)
-              </div>
-            </div>
-
-            {/* Greetings */}
-            <div
-              className="p-6 rounded-2xl backdrop-blur-sm"
-              style={{
-                background: "rgba(26, 26, 36, 0.75)",
-                border: "1px solid rgba(138, 43, 226, 0.3)",
-                boxShadow: "0 8px 32px rgba(255, 0, 140, 0.15)",
-              }}
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-orange-600">
-                  <i className="ri-chat-3-line text-white text-xl" />
-                </div>
-
-                <h2 className="text-xl font-semibold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                  Initial Greetings
-                </h2>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-purple-300 mb-2">Returning Caller Greeting</label>
-                  <textarea
-                    className="w-full min-h-[110px] px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white"
-                    value={existingGreeting}
-                    onChange={(e) => setExistingGreeting(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-purple-300 mb-2">New Caller Greeting</label>
-                  <textarea
-                    className="w-full min-h-[110px] px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white"
-                    value={newCallerGreeting}
-                    onChange={(e) => setNewCallerGreeting(e.target.value)}
-                  />
-                </div>
+            {/* SECOND ROW: Greetings (two cards) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <CardShell icon="ri-chat-smile-2-line" title="New Caller Greeting">
+                <textarea
+                  value={newCallerGreeting}
+                  onChange={(e) => setNewCallerGreeting(e.target.value)}
+                  placeholder="Greeting for brand new callers…"
+                  className="w-full min-h-[180px] px-4 py-3 rounded-lg bg-black/40 border border-purple-500/30 text-white focus:outline-none focus:border-purple-500"
+                />
 
                 <button
-                  className="w-full px-4 py-3 rounded-lg text-white font-semibold"
-                  style={{ background: "linear-gradient(90deg, #8a2be2, #ff6a00)", opacity: isSavingGreetings ? 0.6 : 1 }}
-                  onClick={saveGreetings}
-                  disabled={isSavingGreetings}
+                  onClick={() => saveGreetings("new")}
+                  disabled={isSavingNewGreeting}
+                  className="mt-4 w-full py-3 rounded-lg font-semibold transition-all"
+                  style={{
+                    background: isSavingNewGreeting
+                      ? "rgba(138, 43, 226, 0.4)"
+                      : "linear-gradient(90deg, #8a2be2, #ff6a00)",
+                    color: "white",
+                    cursor: isSavingNewGreeting ? "not-allowed" : "pointer",
+                  }}
                 >
-                  {isSavingGreetings ? "Saving…" : "💾 Save Greetings"}
+                  {isSavingNewGreeting ? "Saving..." : "💾 Save New Greeting"}
                 </button>
-              </div>
+              </CardShell>
+
+              <CardShell icon="ri-chat-voice-line" title="Returning Caller Greeting">
+                <textarea
+                  value={existingGreeting}
+                  onChange={(e) => setExistingGreeting(e.target.value)}
+                  placeholder="Greeting for returning callers…"
+                  className="w-full min-h-[180px] px-4 py-3 rounded-lg bg-black/40 border border-purple-500/30 text-white focus:outline-none focus:border-purple-500"
+                />
+
+                <button
+                  onClick={() => saveGreetings("existing")}
+                  disabled={isSavingExistingGreeting}
+                  className="mt-4 w-full py-3 rounded-lg font-semibold transition-all"
+                  style={{
+                    background: isSavingExistingGreeting
+                      ? "rgba(138, 43, 226, 0.4)"
+                      : "linear-gradient(90deg, #8a2be2, #ff6a00)",
+                    color: "white",
+                    cursor: isSavingExistingGreeting ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {isSavingExistingGreeting ? "Saving..." : "💾 Save Returning Greeting"}
+                </button>
+              </CardShell>
             </div>
           </div>
         )}
