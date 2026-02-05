@@ -2,18 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import CoreLayout from "../../components/layout/CoreLayout";
 
 // -----------------------------------------------------------------------------
-// Backend API base
+// Backend API base (MUST be nginx/Flask, not Vercel)
 // -----------------------------------------------------------------------------
-// This project is Vite-based. Other pages use VITE_API_URL to point at nginx→Flask.
 // In prod, set:
 //   VITE_API_URL=https://app.neurospherevoiceai.com/api
-//
-// Fallback is provided so this page doesn't silently hit Vercel HTML.
 // -----------------------------------------------------------------------------
 const API_BASE =
   import.meta.env.VITE_API_URL || "https://app.neurospherevoiceai.com/api";
-
-const DRAFT_KEY = "ns_personality_studio_draft_v1";
 
 type PromptBlocksLoadResponse = {
   success?: boolean;
@@ -33,22 +28,14 @@ type PromptBlocksPresetsResponse = {
   error?: string;
 };
 
-// ✅ Keep same voice options you already use elsewhere (values match backend IDs)
-const VOICE_OPTIONS = [
-  { value: "alloy", label: "Alloy" },
-  { value: "echo", label: "Echo" },
-  { value: "shimmer", label: "Shimmer" },
-  { value: "ash", label: "Ash" },
-  { value: "ballad", label: "Ballad" },
-  { value: "coral", label: "Coral" },
-  { value: "sage", label: "Sage" },
-  { value: "verse", label: "Verse" },
-  { value: "cedar", label: "Cedar" },
-  { value: "marin", label: "Marin" },
-  { value: "sol", label: "Sol" },
-] as const;
-
 type PromptKey = "main" | "mood" | "knowledge" | "safety";
+type BlockKey =
+  | "system_role"
+  | "emotional_tone"
+  | "knowledge_context"
+  | "safety_boundaries"
+  | "conversational_style";
+
 type SliderKey =
   | "warmth" | "formality" | "humor" | "directness"
   | "empathy" | "confidence" | "curiosity" | "patience"
@@ -75,7 +62,7 @@ const DEFAULT_50: Record<SliderKey, number> = SLIDER_KEYS.reduce((acc, k) => {
   return acc;
 }, {} as Record<SliderKey, number>);
 
-// ✅ Your 6 presets + 2 expansions (we’ll refine numbers later)
+// ✅ Presets are UI-only; sliders are saved server-side (customer config)
 const PRESETS: Record<string, Record<SliderKey, number>> = {
   professional: {
     ...DEFAULT_50,
@@ -106,8 +93,6 @@ const PRESETS: Record<string, Record<SliderKey, number>> = {
     formality: 15, directness: 45, risk: 65, caution: 30,
   },
   balanced: { ...DEFAULT_50 },
-
-  // Added:
   concierge: {
     ...DEFAULT_50,
     warmth: 85, formality: 60, empathy: 80, patience: 85,
@@ -172,12 +157,30 @@ function Card({ title, icon, children }: any) {
   );
 }
 
-function Slider({ k, label, value, onChange }: { k: SliderKey; label: string; value: number; onChange: (k: SliderKey, v: number) => void; }) {
+function Slider({
+  k,
+  label,
+  value,
+  onChange,
+}: {
+  k: SliderKey;
+  label: string;
+  value: number;
+  onChange: (k: SliderKey, v: number) => void;
+}) {
   return (
-    <div className="p-4 rounded-lg" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(138, 43, 226, 0.12)" }}>
+    <div
+      className="p-4 rounded-lg"
+      style={{
+        background: "rgba(0,0,0,0.35)",
+        border: "1px solid rgba(138, 43, 226, 0.12)",
+      }}
+    >
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-200">{label}</div>
-        <div className="text-sm" style={{ color: "#fbbf24" }}>{value}</div>
+        <div className="text-sm" style={{ color: "#fbbf24" }}>
+          {value}
+        </div>
       </div>
       <input
         type="range"
@@ -192,8 +195,15 @@ function Slider({ k, label, value, onChange }: { k: SliderKey; label: string; va
 }
 
 export default function PersonalityStudioPage() {
-  const [promptMode, setPromptMode] = useState<"v1" | "v2">("v1");
-  const [voice, setVoice] = useState<(typeof VOICE_OPTIONS)[number]["value"]>("sol");
+  const [statusMsg, setStatusMsg] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Prompt blocks (server)
+  const [serverBlocks, setServerBlocks] = useState<Record<string, any>>({});
+  const [isSavingField, setIsSavingField] = useState<BlockKey | null>(null);
+
+  // Customer config (server) — sliders
+  const [isSavingSliders, setIsSavingSliders] = useState(false);
 
   const [prompts, setPrompts] = useState<Record<PromptKey, string>>({
     main: "",
@@ -202,16 +212,12 @@ export default function PersonalityStudioPage() {
     safety: "",
   });
 
-  // ---------------------------------------------------------------------------
-  // Server wiring (Prompt Blocks)
-  // ---------------------------------------------------------------------------
-  const [statusMsg, setStatusMsg] = useState<string>("");
-  const [isLoadingServer, setIsLoadingServer] = useState(false);
-  const [isSavingServer, setIsSavingServer] = useState(false);
+  const [preset, setPreset] = useState<string>("balanced");
+  const [sliders, setSliders] = useState<Record<SliderKey, number>>({ ...DEFAULT_50 });
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // We preserve any existing prompt blocks we don't render on this page
-  // (e.g., conversational_style) so we don't accidentally wipe them.
-  const [serverBlocks, setServerBlocks] = useState<Record<string, any>>({});
+  const getCustomerId = () =>
+    localStorage.getItem("customerId") || sessionStorage.getItem("customerId");
 
   const parseJsonOrThrow = async <T,>(res: Response): Promise<T> => {
     const ct = (res.headers.get("content-type") || "").toLowerCase();
@@ -230,8 +236,6 @@ export default function PersonalityStudioPage() {
   };
 
   const blocksToPrompts = (blocks: Record<string, any>) => {
-    // Map our 4 UI fields → ChatStack prompt template categories
-    // (system_role, emotional_tone, knowledge_context, safety_boundaries)
     const systemRole = blocks.system_role ?? "";
     const emotionalTone = blocks.emotional_tone ?? "";
     const knowledgeContext = blocks.knowledge_context ?? "";
@@ -243,15 +247,25 @@ export default function PersonalityStudioPage() {
       knowledge: typeof knowledgeContext === "string" ? knowledgeContext : "",
       safety: typeof safetyBoundaries === "string" ? safetyBoundaries : "",
     });
-
-    const any = [systemRole, emotionalTone, knowledgeContext, safetyBoundaries].some(
-      (v) => typeof v === "string" && v.trim().length > 0
-    );
-    setPromptMode(any ? "v2" : "v1");
   };
 
-  const loadFromServer = async () => {
-    setIsLoadingServer(true);
+  const applyStarter = (key: PromptKey, value: string) => {
+    setPrompts((p) => ({ ...p, [key]: value }));
+  };
+
+  const applyPreset = (name: string) => {
+    const next = PRESETS[name] || PRESETS.balanced;
+    setPreset(name);
+    setSliders({ ...next });
+  };
+
+  const setSlider = (k: SliderKey, v: number) => {
+    setSliders((s) => ({ ...s, [k]: v }));
+    if (preset !== "custom") setPreset("custom");
+  };
+
+  const loadPromptBlocks = async () => {
+    setIsLoading(true);
     setStatusMsg("");
 
     try {
@@ -262,14 +276,12 @@ export default function PersonalityStudioPage() {
 
       if (res.status === 401 || res.status === 403) {
         setStatusMsg("❌ Unauthorized. Please log in again.");
-        setIsLoadingServer(false);
         return;
       }
 
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
         setStatusMsg(`❌ Failed to load prompts: HTTP ${res.status} ${txt}`);
-        setIsLoadingServer(false);
         return;
       }
 
@@ -277,16 +289,12 @@ export default function PersonalityStudioPage() {
 
       if (!data?.success) {
         setStatusMsg(`❌ Failed to load prompts: ${data?.error || "unknown error"}`);
-        setIsLoadingServer(false);
         return;
       }
 
-      const blocks = data.blocks || {};
-      setServerBlocks(blocks);
+      // Blocks can be stored as preset keys; resolve to prompt text for display.
+      let displayBlocks: Record<string, any> = { ...(data.blocks || {}) };
 
-      // If the server stored preset KEYS (not full text), resolve them into prompt text for display.
-      // (This matches ChatStack build_complete_prompt behavior.)
-      let displayBlocks: Record<string, any> = { ...blocks };
       try {
         const presRes = await fetch(`${API_BASE}/prompt-blocks/presets`, {
           method: "GET",
@@ -314,111 +322,145 @@ export default function PersonalityStudioPage() {
           };
         }
       } catch {
-        // Non-fatal: if presets can't load, we still show the raw values.
+        // non-fatal
       }
 
+      setServerBlocks(displayBlocks);
       blocksToPrompts(displayBlocks);
-
-      setStatusMsg("✅ Loaded saved prompts.");
+      setStatusMsg("✅ Loaded prompt settings.");
     } catch (e: any) {
       setStatusMsg(`❌ Load error: ${e?.message || String(e)}`);
     } finally {
-      setIsLoadingServer(false);
+      setIsLoading(false);
     }
   };
 
-  const saveDraft = () => {
+  const loadSliders = async () => {
     try {
-      const payload = {
-        saved_at: new Date().toISOString(),
-        prompts,
-        preset,
-        sliders,
-        memPolicy,
-        voice,
-      };
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
-      setStatusMsg("✅ Draft saved locally (this does NOT affect live calls).");
-    } catch (e: any) {
-      setStatusMsg(`❌ Failed to save draft locally: ${e?.message || String(e)}`);
+      const customerId = getCustomerId();
+      if (!customerId) return;
+
+      const res = await fetch(`${API_BASE}/customers/${customerId}/config`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (!res.ok) return;
+
+      const cfg = await parseJsonOrThrow<any>(res);
+      const saved = cfg?.sliders;
+
+      if (saved && typeof saved === "object") {
+        // Only apply known numeric keys to avoid weirdness.
+        const next: Record<SliderKey, number> = { ...DEFAULT_50 };
+        let hasAny = false;
+
+        for (const k of SLIDER_KEYS) {
+          const v = saved[k];
+          if (typeof v === "number" && Number.isFinite(v)) {
+            next[k] = Math.min(100, Math.max(0, v));
+            hasAny = true;
+          }
+        }
+
+        if (hasAny) {
+          setSliders(next);
+          setPreset("custom");
+        }
+      }
+    } catch {
+      // non-fatal
     }
   };
 
-  const publish = async () => {
-    setIsSavingServer(true);
+  const saveBlocks = async (nextBlocks: Record<string, any>, savedLabel: string) => {
+    const res = await fetch(`${API_BASE}/prompt-blocks/save`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ blocks: nextBlocks }),
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      throw new Error("Unauthorized. Please log in again.");
+    }
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status} ${txt}`);
+    }
+
+    const data = await parseJsonOrThrow<PromptBlocksSaveResponse>(res);
+
+    if (!data?.success) {
+      throw new Error(data?.error || "Unknown error saving prompt blocks");
+    }
+
+    setServerBlocks(nextBlocks);
+    setStatusMsg(`✅ Saved ${savedLabel}.`);
+  };
+
+  const savePromptField = async (field: BlockKey, value: string, label: string) => {
+    setIsSavingField(field);
     setStatusMsg("");
 
     try {
-      // Merge with any existing blocks so we don't wipe other categories.
-      const nextBlocks = {
-        ...serverBlocks,
-        system_role: prompts.main,
-        emotional_tone: prompts.mood,
-        knowledge_context: prompts.knowledge,
-        safety_boundaries: prompts.safety,
-      };
+      // Merge so we never wipe other categories.
+      const nextBlocks = { ...serverBlocks, [field]: value };
+      await saveBlocks(nextBlocks, label);
+    } catch (e: any) {
+      setStatusMsg(`❌ Save failed: ${e?.message || String(e)}`);
+    } finally {
+      setIsSavingField(null);
+    }
+  };
 
-      const res = await fetch(`${API_BASE}/prompt-blocks/save`, {
+  const saveSlidersToServer = async () => {
+    setIsSavingSliders(true);
+    setStatusMsg("");
+
+    try {
+      const customerId = getCustomerId();
+      if (!customerId) {
+        setStatusMsg("❌ No customer ID found. Please log in again.");
+        return;
+      }
+
+      // Backend accepts "sliders" as a dict and mirrors to AI-Memory.
+      const res = await fetch(`${API_BASE}/customers/${customerId}/config`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blocks: nextBlocks }),
+        body: JSON.stringify({ sliders }),
       });
 
       if (res.status === 401 || res.status === 403) {
         setStatusMsg("❌ Unauthorized. Please log in again.");
-        setIsSavingServer(false);
         return;
       }
 
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
-        setStatusMsg(`❌ Publish failed: HTTP ${res.status} ${txt}`);
+        setStatusMsg(`❌ Save failed: HTTP ${res.status} ${txt}`);
         return;
       }
 
-      const data = await parseJsonOrThrow<PromptBlocksSaveResponse>(res);
-
-      if (!data?.success) {
-        setStatusMsg(`❌ Publish failed: ${data?.error || "unknown error"}`);
-        return;
-      }
-
-      setStatusMsg("🔥 Published to server. New calls will use these prompt blocks.");
-      setPromptMode("v2");
-      await loadFromServer();
+      setStatusMsg("✅ Saved sliders.");
+      // Pull back what backend actually stored (optional, but keeps us honest)
+      await loadSliders();
     } catch (e: any) {
-      setStatusMsg(`❌ Publish error: ${e?.message || String(e)}`);
+      setStatusMsg(`❌ Save failed: ${e?.message || String(e)}`);
     } finally {
-      setIsSavingServer(false);
+      setIsSavingSliders(false);
     }
   };
 
-  const [preset, setPreset] = useState<string>("balanced");
-  const [sliders, setSliders] = useState<Record<SliderKey, number>>({ ...DEFAULT_50 });
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  const [memPolicy, setMemPolicy] = useState({
-    useName: true,
-    referenceNaturally: true,
-    neverListMemory: true,
-    avoidRepeats: true,
-  });
-
-  const applyStarter = (key: PromptKey, value: string) => {
-    setPrompts((p) => ({ ...p, [key]: value }));
-  };
-
-  const applyPreset = (name: string) => {
-    const next = PRESETS[name] || PRESETS.balanced;
-    setPreset(name);
-    setSliders({ ...next });
-  };
-
-  const setSlider = (k: SliderKey, v: number) => {
-    setSliders((s) => ({ ...s, [k]: v }));
-    if (preset !== "custom") setPreset("custom");
-  };
+  useEffect(() => {
+    // Load both prompt blocks + sliders on open
+    loadPromptBlocks();
+    loadSliders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const assembledPreview = useMemo(() => {
     const sliderSummary = `Preset: ${preset}\nSliders (sample): warmth=${sliders.warmth}, formality=${sliders.formality}, humor=${sliders.humor}, directness=${sliders.directness}`;
@@ -435,29 +477,18 @@ export default function PersonalityStudioPage() {
       "=== SAFETY ===",
       prompts.safety || "(empty)",
       "",
-      "=== PERSONALITY MODULATION ===",
+      "=== STYLE (SLIDERS) ===",
       sliderSummary,
-      "",
-      "=== MEMORY BEHAVIOR ===",
-      JSON.stringify(memPolicy, null, 2),
     ].join("\n");
-  }, [prompts, sliders, preset, memPolicy]);
-
-  useEffect(() => {
-    // Load saved prompt blocks from server on page open
-    loadFromServer();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [prompts, sliders, preset]);
 
   const statusBg =
     statusMsg.startsWith("❌") ? "rgba(239,68,68,0.2)" :
-    statusMsg.startsWith("🔥") ? "rgba(249,115,22,0.2)" :
     statusMsg.startsWith("✅") ? "rgba(34,197,94,0.2)" :
     "rgba(255,255,255,0.03)";
 
   const statusColor =
     statusMsg.startsWith("❌") ? "#fca5a5" :
-    statusMsg.startsWith("🔥") ? "#fdba74" :
     statusMsg.startsWith("✅") ? "#86efac" :
     "#d1d5db";
 
@@ -479,64 +510,24 @@ export default function PersonalityStudioPage() {
               PERSONALITY STUDIO
             </h1>
             <p className="text-gray-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              Design your agent’s prompts and personality. Prompts save to server; sliders/voice wiring comes next.
+              Prompt + style controls. Every Save writes to the server immediately.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
-            <div
-              className="px-3 py-2 rounded-lg text-sm"
-              style={{
-                border: "1px solid rgba(138, 43, 226, 0.3)",
-                background: "rgba(255,255,255,0.03)",
-                color: promptMode === "v1" ? "#fbbf24" : "#86efac",
-              }}
-              title="Legacy = no saved prompt blocks. Studio = prompt blocks saved."
-            >
-              Mode: {promptMode === "v1" ? "Legacy (v1)" : "Studio (v2)"}
-            </div>
-
             <button
               className="px-4 py-2 rounded-lg text-sm font-semibold"
               style={{
                 background: "rgba(255,255,255,0.03)",
                 border: "1px solid rgba(138, 43, 226, 0.2)",
                 color: "#aaaaaa",
-                opacity: isLoadingServer ? 0.6 : 1,
+                opacity: isLoading ? 0.6 : 1,
               }}
-              onClick={loadFromServer}
-              disabled={isLoadingServer || isSavingServer}
+              onClick={() => { loadPromptBlocks(); loadSliders(); }}
+              disabled={isLoading || !!isSavingField || isSavingSliders}
               title="Reload from server"
             >
-              {isLoadingServer ? "Loading…" : "Reload"}
-            </button>
-
-            <button
-              className="px-4 py-2 rounded-lg text-sm font-semibold"
-              style={{
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(138, 43, 226, 0.2)",
-                color: "#aaaaaa",
-                opacity: isSavingServer ? 0.6 : 1,
-              }}
-              onClick={saveDraft}
-              disabled={isLoadingServer || isSavingServer}
-              title="Save locally only (does not affect calls)"
-            >
-              Save Draft
-            </button>
-
-            <button
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-              style={{
-                background: "linear-gradient(90deg, #8a2be2, #ff6a00)",
-                opacity: isSavingServer ? 0.6 : 1,
-              }}
-              onClick={publish}
-              disabled={isLoadingServer || isSavingServer}
-              title="Save to server (affects new calls)"
-            >
-              {isSavingServer ? "Publishing…" : "Publish"}
+              {isLoading ? "Loading…" : "Reload"}
             </button>
           </div>
         </div>
@@ -555,8 +546,8 @@ export default function PersonalityStudioPage() {
           </div>
         )}
 
-        {/* System Prompts */}
         <div className="max-w-6xl mx-auto space-y-6">
+          {/* Prompts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Main */}
             <Card title="Main System Prompt" icon="ri-file-text-line">
@@ -580,6 +571,7 @@ export default function PersonalityStudioPage() {
                 onChange={(e) => setPrompts((p) => ({ ...p, main: e.target.value }))}
               />
 
+              {/* Buttons: AI Generate | Save */}
               <div className="flex gap-2 mt-3">
                 <button
                   className="flex-1 px-4 py-2 rounded-lg text-white font-semibold"
@@ -588,14 +580,25 @@ export default function PersonalityStudioPage() {
                 >
                   ✨ AI Generate
                 </button>
+
                 <button
-                  className="px-4 py-2 rounded-lg"
-                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(138, 43, 226, 0.15)", color: "#aaaaaa" }}
-                  onClick={() => setPrompts((p) => ({ ...p, main: "" }))}
+                  className="flex-1 px-4 py-2 rounded-lg text-white font-semibold"
+                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(138, 43, 226, 0.25)" }}
+                  onClick={() => savePromptField("system_role", prompts.main, "Main prompt")}
+                  disabled={isSavingField === "system_role"}
+                  title="Save to server immediately"
                 >
-                  Reset
+                  {isSavingField === "system_role" ? "Saving…" : "💾 Save"}
                 </button>
               </div>
+
+              <button
+                className="mt-3 text-sm"
+                style={{ color: "#aaaaaa" }}
+                onClick={() => setPrompts((p) => ({ ...p, main: "" }))}
+              >
+                Reset
+              </button>
             </Card>
 
             {/* Mood */}
@@ -628,14 +631,25 @@ export default function PersonalityStudioPage() {
                 >
                   ✨ AI Generate
                 </button>
+
                 <button
-                  className="px-4 py-2 rounded-lg"
-                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(138, 43, 226, 0.15)", color: "#aaaaaa" }}
-                  onClick={() => setPrompts((p) => ({ ...p, mood: "" }))}
+                  className="flex-1 px-4 py-2 rounded-lg text-white font-semibold"
+                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(138, 43, 226, 0.25)" }}
+                  onClick={() => savePromptField("emotional_tone", prompts.mood, "Mood prompt")}
+                  disabled={isSavingField === "emotional_tone"}
+                  title="Save to server immediately"
                 >
-                  Reset
+                  {isSavingField === "emotional_tone" ? "Saving…" : "💾 Save"}
                 </button>
               </div>
+
+              <button
+                className="mt-3 text-sm"
+                style={{ color: "#aaaaaa" }}
+                onClick={() => setPrompts((p) => ({ ...p, mood: "" }))}
+              >
+                Reset
+              </button>
             </Card>
 
             {/* Knowledge */}
@@ -659,6 +673,34 @@ export default function PersonalityStudioPage() {
                 value={prompts.knowledge}
                 onChange={(e) => setPrompts((p) => ({ ...p, knowledge: e.target.value }))}
               />
+
+              <div className="flex gap-2 mt-3">
+                <button
+                  className="flex-1 px-4 py-2 rounded-lg text-white font-semibold"
+                  style={{ background: "rgba(138, 43, 226, 0.25)", border: "1px solid rgba(138, 43, 226, 0.35)" }}
+                  onClick={() => alert("AI Generate will be wired later (4o-mini).")}
+                >
+                  ✨ AI Generate
+                </button>
+
+                <button
+                  className="flex-1 px-4 py-2 rounded-lg text-white font-semibold"
+                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(138, 43, 226, 0.25)" }}
+                  onClick={() => savePromptField("knowledge_context", prompts.knowledge, "Knowledge prompt")}
+                  disabled={isSavingField === "knowledge_context"}
+                  title="Save to server immediately"
+                >
+                  {isSavingField === "knowledge_context" ? "Saving…" : "💾 Save"}
+                </button>
+              </div>
+
+              <button
+                className="mt-3 text-sm"
+                style={{ color: "#aaaaaa" }}
+                onClick={() => setPrompts((p) => ({ ...p, knowledge: "" }))}
+              >
+                Reset
+              </button>
             </Card>
 
             {/* Safety */}
@@ -686,26 +728,69 @@ export default function PersonalityStudioPage() {
                 value={prompts.safety}
                 onChange={(e) => setPrompts((p) => ({ ...p, safety: e.target.value }))}
               />
+
+              <div className="flex gap-2 mt-3">
+                <button
+                  className="flex-1 px-4 py-2 rounded-lg text-white font-semibold"
+                  style={{ background: "rgba(138, 43, 226, 0.25)", border: "1px solid rgba(138, 43, 226, 0.35)" }}
+                  onClick={() => alert("AI Generate will be wired later (4o-mini).")}
+                >
+                  ✨ AI Generate
+                </button>
+
+                <button
+                  className="flex-1 px-4 py-2 rounded-lg text-white font-semibold"
+                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(138, 43, 226, 0.25)" }}
+                  onClick={() => savePromptField("safety_boundaries", prompts.safety, "Safety prompt")}
+                  disabled={isSavingField === "safety_boundaries"}
+                  title="Save to server immediately"
+                >
+                  {isSavingField === "safety_boundaries" ? "Saving…" : "💾 Save"}
+                </button>
+              </div>
+
+              <button
+                className="mt-3 text-sm"
+                style={{ color: "#aaaaaa" }}
+                onClick={() => setPrompts((p) => ({ ...p, safety: "" }))}
+              >
+                Reset
+              </button>
             </Card>
           </div>
 
           {/* Sliders */}
-          <Card title="Personality Presets & Sliders (UI-only for now)" icon="ri-sliders-4-line">
-            <div className="flex flex-wrap items-center gap-3">
-              {Object.keys(PRESETS).map((name) => (
-                <button
-                  key={name}
-                  className="px-4 py-2 rounded-lg text-sm font-semibold"
-                  style={{
-                    background: preset === name ? "rgba(138, 43, 226, 0.28)" : "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(138, 43, 226, 0.2)",
-                    color: preset === name ? "#ffffff" : "#aaaaaa",
-                  }}
-                  onClick={() => applyPreset(name)}
-                >
-                  {name}
-                </button>
-              ))}
+          <Card title="Style Sliders" icon="ri-sliders-4-line">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                {Object.keys(PRESETS).map((name) => (
+                  <button
+                    key={name}
+                    className="px-4 py-2 rounded-lg text-sm font-semibold"
+                    style={{
+                      background: preset === name ? "rgba(138, 43, 226, 0.28)" : "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(138, 43, 226, 0.2)",
+                      color: preset === name ? "#ffffff" : "#aaaaaa",
+                    }}
+                    onClick={() => applyPreset(name)}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+                style={{
+                  background: "linear-gradient(90deg, #8a2be2, #ff6a00)",
+                  opacity: isSavingSliders ? 0.6 : 1,
+                }}
+                onClick={saveSlidersToServer}
+                disabled={isSavingSliders || !!isSavingField}
+                title="Save sliders to server immediately"
+              >
+                {isSavingSliders ? "Saving…" : "💾 Save Sliders"}
+              </button>
             </div>
 
             <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -743,47 +828,6 @@ export default function PersonalityStudioPage() {
               </div>
             )}
           </Card>
-
-          {/* Voice + Memory + Preview */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card title="Voice Selection" icon="ri-mic-line">
-              <label className="block text-sm text-purple-300 mb-2">OpenAI Voice</label>
-              <select
-                className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white"
-                value={voice}
-                onChange={(e) => setVoice(e.target.value as any)}
-              >
-                {VOICE_OPTIONS.map((v) => (
-                  <option key={v.value} value={v.value}>
-                    {v.label} ({v.value})
-                  </option>
-                ))}
-              </select>
-
-              <div className="text-xs text-gray-400 mt-2">
-                (Wiring later: this will save to customer config and apply on next call.)
-              </div>
-            </Card>
-
-            <Card title="Memory Behavior" icon="ri-brain-2-line">
-              <label className="flex items-center gap-2 text-sm text-gray-200">
-                <input type="checkbox" checked={memPolicy.useName} onChange={(e) => setMemPolicy((m) => ({ ...m, useName: e.target.checked }))} />
-                Use caller name when confident
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-200 mt-2">
-                <input type="checkbox" checked={memPolicy.referenceNaturally} onChange={(e) => setMemPolicy((m) => ({ ...m, referenceNaturally: e.target.checked }))} />
-                Reference past conversations naturally
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-200 mt-2">
-                <input type="checkbox" checked={memPolicy.neverListMemory} onChange={(e) => setMemPolicy((m) => ({ ...m, neverListMemory: e.target.checked }))} />
-                Never list memories explicitly
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-200 mt-2">
-                <input type="checkbox" checked={memPolicy.avoidRepeats} onChange={(e) => setMemPolicy((m) => ({ ...m, avoidRepeats: e.target.checked }))} />
-                Avoid repeating known facts
-              </label>
-            </Card>
-          </div>
 
           <Card title="Preview (UI-only)" icon="ri-eye-line">
             <pre
