@@ -1,6 +1,38 @@
 import { useEffect, useMemo, useState } from "react";
 import CoreLayout from "../../components/layout/CoreLayout";
 
+// -----------------------------------------------------------------------------
+// Backend API base
+// -----------------------------------------------------------------------------
+// This project is Vite-based. Other pages use VITE_API_URL to point at nginx→Flask.
+// In prod, set:
+//   VITE_API_URL=https://app.neurospherevoiceai.com/api
+//
+// Fallback is provided so this page doesn't silently hit Vercel HTML.
+// -----------------------------------------------------------------------------
+const API_BASE =
+  import.meta.env.VITE_API_URL || "https://app.neurospherevoiceai.com/api";
+
+const DRAFT_KEY = "ns_personality_studio_draft_v1";
+
+type PromptBlocksLoadResponse = {
+  success?: boolean;
+  blocks?: Record<string, any>;
+  error?: string;
+};
+
+type PromptBlocksSaveResponse = {
+  success?: boolean;
+  message?: string;
+  error?: string;
+};
+
+type PromptBlocksPresetsResponse = {
+  success?: boolean;
+  categories?: Record<string, any>;
+  error?: string;
+};
+
 // ✅ Keep same voice options you already use elsewhere (values match backend IDs)
 const VOICE_OPTIONS = [
   { value: "alloy", label: "Alloy" },
@@ -17,7 +49,6 @@ const VOICE_OPTIONS = [
 ] as const;
 
 type PromptKey = "main" | "mood" | "knowledge" | "safety";
-type PromptMode = "v1" | "v2";
 type SliderKey =
   | "warmth" | "formality" | "humor" | "directness"
   | "empathy" | "confidence" | "curiosity" | "patience"
@@ -27,13 +58,6 @@ type SliderKey =
   | "selfReference" | "topicFocus" | "repetition" | "polish"
   | "intensity" | "caution" | "jargon" | "humorSensitivity"
   | "consistency" | "metaAwareness";
-
-type CustomerConfigResponse = {
-  success?: boolean;
-  prompt_version?: PromptMode;
-  system_prompts?: Record<PromptKey, string>;
-  // other keys exist but we don't need them here yet
-};
 
 const SLIDER_KEYS: SliderKey[] = [
   "warmth","formality","humor","directness",
@@ -118,48 +142,28 @@ const STARTERS: Record<PromptKey, { label: string; value: string }[]> = {
   knowledge: [
     { label: "Insurance Agency (Auto/Home/Umbrella)", value: "You represent an insurance agency. You understand auto, home, and umbrella insurance at a high level." },
     { label: "Customer Service Generalist", value: "You handle general questions, collect details, and route to the right team." },
-    { label: "Sales & Quoting Assistant", value: "You qualify leads, collect quote details, and book appointments." },
-    { label: "Scheduling / Front Desk", value: "Your focus is scheduling, routing, and capturing accurate caller info." },
-    { label: "Claims Support (Non-Legal)", value: "You help with claims intake steps and routing, without giving legal advice." },
     { label: "Blank", value: "" },
   ],
   safety: [
     { label: "Standard Customer Service Safety", value: "Do not provide legal/medical advice. If unsure, escalate. Do not invent facts." },
-    { label: "Insurance Compliance", value: "Do not promise coverage, price, or binding. Route to licensed agent for coverage decisions." },
-    { label: "Sales Compliance", value: "Be honest. No guarantees. Always confirm details before committing." },
-    { label: "Minimal Guardrails", value: "Keep it safe and accurate. Escalate if unsure." },
-    { label: "Custom", value: "" },
+    { label: "Strict Compliance", value: "Follow compliance: no guarantees, no legal advice, no policy binding. Escalate for coverage decisions." },
+    { label: "Blank", value: "" },
   ],
 };
 
-function getCustomerId(): string | null {
-  // ✅ Works with your earlier patterns; adjust if you store it elsewhere
-  return localStorage.getItem("customerId") || sessionStorage.getItem("customerId");
-}
-
-function Card({
-  title,
-  icon,
-  children,
-}: {
-  title: string;
-  icon: string;
-  children: React.ReactNode;
-}) {
+function Card({ title, icon, children }: any) {
   return (
     <div
-      className="p-6 rounded-2xl backdrop-blur-sm"
+      className="rounded-2xl p-6"
       style={{
-        background: "rgba(26, 26, 36, 0.75)",
-        border: "1px solid rgba(138, 43, 226, 0.3)",
-        boxShadow: "0 8px 32px rgba(255, 0, 140, 0.15)",
+        background: "rgba(255,255,255,0.03)",
+        border: "1px solid rgba(138, 43, 226, 0.15)",
+        boxShadow: "0 20px 50px rgba(0,0,0,0.35)",
       }}
     >
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-gradient-to-br from-purple-600 to-orange-600">
-          <i className={`${icon} text-white text-xl`} />
-        </div>
-        <h2 className="text-xl font-semibold text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+      <div className="flex items-center gap-3 mb-4">
+        <i className={`${icon} text-purple-300`} style={{ fontSize: 18 }} />
+        <h2 className="text-xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
           {title}
         </h2>
       </div>
@@ -168,36 +172,27 @@ function Card({
   );
 }
 
-function Slider({
-  k,
-  label,
-  value,
-  onChange,
-}: {
-  k: SliderKey;
-  label: string;
-  value: number;
-  onChange: (k: SliderKey, v: number) => void;
-}) {
+function Slider({ k, label, value, onChange }: { k: SliderKey; label: string; value: number; onChange: (k: SliderKey, v: number) => void; }) {
   return (
-    <div className="col-md-6">
-      <label className="block text-sm text-purple-300 mb-2">
-        {label}: <span className="text-orange-300">{value}</span>/100
-      </label>
+    <div className="p-4 rounded-lg" style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(138, 43, 226, 0.12)" }}>
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-200">{label}</div>
+        <div className="text-sm" style={{ color: "#fbbf24" }}>{value}</div>
+      </div>
       <input
         type="range"
         min={0}
         max={100}
         value={value}
         onChange={(e) => onChange(k, Number(e.target.value))}
-        className="w-full accent-orange-500"
+        className="w-full mt-3"
       />
     </div>
   );
 }
 
 export default function PersonalityStudioPage() {
-  const [promptMode, setPromptMode] = useState<PromptMode>("v1");
+  const [promptMode, setPromptMode] = useState<"v1" | "v2">("v1");
   const [voice, setVoice] = useState<(typeof VOICE_OPTIONS)[number]["value"]>("sol");
 
   const [prompts, setPrompts] = useState<Record<PromptKey, string>>({
@@ -206,6 +201,198 @@ export default function PersonalityStudioPage() {
     knowledge: "",
     safety: "",
   });
+
+  // ---------------------------------------------------------------------------
+  // Server wiring (Prompt Blocks)
+  // ---------------------------------------------------------------------------
+  const [statusMsg, setStatusMsg] = useState<string>("");
+  const [isLoadingServer, setIsLoadingServer] = useState(false);
+  const [isSavingServer, setIsSavingServer] = useState(false);
+
+  // We preserve any existing prompt blocks we don't render on this page
+  // (e.g., conversational_style) so we don't accidentally wipe them.
+  const [serverBlocks, setServerBlocks] = useState<Record<string, any>>({});
+
+  const parseJsonOrThrow = async <T,>(res: Response): Promise<T> => {
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+
+    if (ct.includes("application/json")) {
+      return (await res.json()) as T;
+    }
+
+    // If we hit Vercel / SPA, we'll usually get text/html → index.html
+    const txt = await res.text().catch(() => "");
+    const preview = txt.slice(0, 240).replace(/\s+/g, " ").trim();
+
+    throw new Error(
+      `Expected JSON but got "${ct || "unknown"}". Preview: ${preview || "(empty)"}`
+    );
+  };
+
+  const blocksToPrompts = (blocks: Record<string, any>) => {
+    // Map our 4 UI fields → ChatStack prompt template categories
+    // (system_role, emotional_tone, knowledge_context, safety_boundaries)
+    const systemRole = blocks.system_role ?? "";
+    const emotionalTone = blocks.emotional_tone ?? "";
+    const knowledgeContext = blocks.knowledge_context ?? "";
+    const safetyBoundaries = blocks.safety_boundaries ?? "";
+
+    setPrompts({
+      main: typeof systemRole === "string" ? systemRole : "",
+      mood: typeof emotionalTone === "string" ? emotionalTone : "",
+      knowledge: typeof knowledgeContext === "string" ? knowledgeContext : "",
+      safety: typeof safetyBoundaries === "string" ? safetyBoundaries : "",
+    });
+
+    const any = [systemRole, emotionalTone, knowledgeContext, safetyBoundaries].some(
+      (v) => typeof v === "string" && v.trim().length > 0
+    );
+    setPromptMode(any ? "v2" : "v1");
+  };
+
+  const loadFromServer = async () => {
+    setIsLoadingServer(true);
+    setStatusMsg("");
+
+    try {
+      const res = await fetch(`${API_BASE}/prompt-blocks/load`, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        setStatusMsg("❌ Unauthorized. Please log in again.");
+        setIsLoadingServer(false);
+        return;
+      }
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        setStatusMsg(`❌ Failed to load prompts: HTTP ${res.status} ${txt}`);
+        setIsLoadingServer(false);
+        return;
+      }
+
+      const data = await parseJsonOrThrow<PromptBlocksLoadResponse>(res);
+
+      if (!data?.success) {
+        setStatusMsg(`❌ Failed to load prompts: ${data?.error || "unknown error"}`);
+        setIsLoadingServer(false);
+        return;
+      }
+
+      const blocks = data.blocks || {};
+      setServerBlocks(blocks);
+
+      // If the server stored preset KEYS (not full text), resolve them into prompt text for display.
+      // (This matches ChatStack build_complete_prompt behavior.)
+      let displayBlocks: Record<string, any> = { ...blocks };
+      try {
+        const presRes = await fetch(`${API_BASE}/prompt-blocks/presets`, {
+          method: "GET",
+          credentials: "include",
+        });
+
+        if (presRes.ok) {
+          const pres = await parseJsonOrThrow<PromptBlocksPresetsResponse>(presRes);
+          const cats = pres?.categories || {};
+
+          const resolvePreset = (categoryKey: string, value: any) => {
+            if (typeof value !== "string") return value;
+            const presets = cats?.[categoryKey]?.presets || {};
+            const hit = presets?.[value];
+            return hit?.prompt || value;
+          };
+
+          displayBlocks = {
+            ...displayBlocks,
+            system_role: resolvePreset("system_role", displayBlocks.system_role),
+            emotional_tone: resolvePreset("emotional_tone", displayBlocks.emotional_tone),
+            conversational_style: resolvePreset("conversational_style", displayBlocks.conversational_style),
+            knowledge_context: resolvePreset("knowledge_context", displayBlocks.knowledge_context),
+            safety_boundaries: resolvePreset("safety_boundaries", displayBlocks.safety_boundaries),
+          };
+        }
+      } catch {
+        // Non-fatal: if presets can't load, we still show the raw values.
+      }
+
+      blocksToPrompts(displayBlocks);
+
+      setStatusMsg("✅ Loaded saved prompts.");
+    } catch (e: any) {
+      setStatusMsg(`❌ Load error: ${e?.message || String(e)}`);
+    } finally {
+      setIsLoadingServer(false);
+    }
+  };
+
+  const saveDraft = () => {
+    try {
+      const payload = {
+        saved_at: new Date().toISOString(),
+        prompts,
+        preset,
+        sliders,
+        memPolicy,
+        voice,
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(payload));
+      setStatusMsg("✅ Draft saved locally (this does NOT affect live calls).");
+    } catch (e: any) {
+      setStatusMsg(`❌ Failed to save draft locally: ${e?.message || String(e)}`);
+    }
+  };
+
+  const publish = async () => {
+    setIsSavingServer(true);
+    setStatusMsg("");
+
+    try {
+      // Merge with any existing blocks so we don't wipe other categories.
+      const nextBlocks = {
+        ...serverBlocks,
+        system_role: prompts.main,
+        emotional_tone: prompts.mood,
+        knowledge_context: prompts.knowledge,
+        safety_boundaries: prompts.safety,
+      };
+
+      const res = await fetch(`${API_BASE}/prompt-blocks/save`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blocks: nextBlocks }),
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        setStatusMsg("❌ Unauthorized. Please log in again.");
+        setIsSavingServer(false);
+        return;
+      }
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        setStatusMsg(`❌ Publish failed: HTTP ${res.status} ${txt}`);
+        return;
+      }
+
+      const data = await parseJsonOrThrow<PromptBlocksSaveResponse>(res);
+
+      if (!data?.success) {
+        setStatusMsg(`❌ Publish failed: ${data?.error || "unknown error"}`);
+        return;
+      }
+
+      setStatusMsg("🔥 Published to server. New calls will use these prompt blocks.");
+      setPromptMode("v2");
+      await loadFromServer();
+    } catch (e: any) {
+      setStatusMsg(`❌ Publish error: ${e?.message || String(e)}`);
+    } finally {
+      setIsSavingServer(false);
+    }
+  };
 
   const [preset, setPreset] = useState<string>("balanced");
   const [sliders, setSliders] = useState<Record<SliderKey, number>>({ ...DEFAULT_50 });
@@ -217,10 +404,6 @@ export default function PersonalityStudioPage() {
     neverListMemory: true,
     avoidRepeats: true,
   });
-
-  const [statusMsg, setStatusMsg] = useState<string>("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoadingConfig, setIsLoadingConfig] = useState(false);
 
   const applyStarter = (key: PromptKey, value: string) => {
     setPrompts((p) => ({ ...p, [key]: value }));
@@ -260,137 +443,9 @@ export default function PersonalityStudioPage() {
     ].join("\n");
   }, [prompts, sliders, preset, memPolicy]);
 
-  const loadConfig = async () => {
-    setIsLoadingConfig(true);
-    setStatusMsg("");
-
-    const customerId = getCustomerId();
-    if (!customerId) {
-      setStatusMsg("❌ No customerId found (local/session storage). Log in again.");
-      setIsLoadingConfig(false);
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/customers/${customerId}/config`, {
-        method: "GET",
-        credentials: "include",
-      });
-
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        setStatusMsg(`❌ Failed to load config: HTTP ${res.status} ${txt}`);
-        setIsLoadingConfig(false);
-        return;
-      }
-
-      const data = (await res.json()) as CustomerConfigResponse;
-
-      const pv = (data.prompt_version || "v1") as PromptMode;
-      setPromptMode(pv);
-
-      const sp = data.system_prompts || {};
-      setPrompts({
-        main: sp.main || "",
-        mood: sp.mood || "",
-        knowledge: sp.knowledge || "",
-        safety: sp.safety || "",
-      });
-
-      setStatusMsg("✅ Loaded saved prompts.");
-    } catch (e: any) {
-      setStatusMsg(`❌ Load error: ${e?.message || String(e)}`);
-    } finally {
-      setIsLoadingConfig(false);
-    }
-  };
-
-  const saveDraft = async () => {
-    setIsSaving(true);
-    setStatusMsg("");
-
-    const customerId = getCustomerId();
-    if (!customerId) {
-      setStatusMsg("❌ No customerId found. Log in again.");
-      setIsSaving(false);
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/customers/${customerId}/config`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_prompts: {
-            main: prompts.main,
-            mood: prompts.mood,
-            knowledge: prompts.knowledge,
-            safety: prompts.safety,
-          },
-        }),
-      });
-
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        setStatusMsg(`❌ Save Draft failed: HTTP ${res.status} ${txt}`);
-        return;
-      }
-
-      setStatusMsg("✅ Draft saved. (Legacy stays until you Publish.)");
-      await loadConfig();
-    } catch (e: any) {
-      setStatusMsg(`❌ Save error: ${e?.message || String(e)}`);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const publish = async () => {
-    setIsSaving(true);
-    setStatusMsg("");
-
-    const customerId = getCustomerId();
-    if (!customerId) {
-      setStatusMsg("❌ No customerId found. Log in again.");
-      setIsSaving(false);
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/customers/${customerId}/config`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt_version: "v2",
-          system_prompts: {
-            main: prompts.main,
-            mood: prompts.mood,
-            knowledge: prompts.knowledge,
-            safety: prompts.safety,
-          },
-        }),
-      });
-
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        setStatusMsg(`❌ Publish failed: HTTP ${res.status} ${txt}`);
-        return;
-      }
-
-      setStatusMsg("🔥 Published. New calls will use Personality Studio (v2).");
-      await loadConfig();
-    } catch (e: any) {
-      setStatusMsg(`❌ Publish error: ${e?.message || String(e)}`);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   useEffect(() => {
-    // Load saved data when page opens
-    loadConfig();
+    // Load saved prompt blocks from server on page open
+    loadFromServer();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -410,7 +465,7 @@ export default function PersonalityStudioPage() {
     <CoreLayout>
       <div className="p-8">
         {/* Header */}
-        <div className="mb-6 flex items-start justify-between gap-6">
+        <div className="mb-8 flex items-start justify-between gap-6">
           <div>
             <h1
               className="text-4xl font-bold mb-2"
@@ -424,7 +479,7 @@ export default function PersonalityStudioPage() {
               PERSONALITY STUDIO
             </h1>
             <p className="text-gray-400" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              System prompts are now editable and saveable. Sliders wiring comes next.
+              Design your agent’s prompts and personality. Prompts save to server; sliders/voice wiring comes next.
             </p>
           </div>
 
@@ -436,6 +491,7 @@ export default function PersonalityStudioPage() {
                 background: "rgba(255,255,255,0.03)",
                 color: promptMode === "v1" ? "#fbbf24" : "#86efac",
               }}
+              title="Legacy = no saved prompt blocks. Studio = prompt blocks saved."
             >
               Mode: {promptMode === "v1" ? "Legacy (v1)" : "Studio (v2)"}
             </div>
@@ -446,13 +502,13 @@ export default function PersonalityStudioPage() {
                 background: "rgba(255,255,255,0.03)",
                 border: "1px solid rgba(138, 43, 226, 0.2)",
                 color: "#aaaaaa",
-                opacity: isLoadingConfig ? 0.6 : 1,
+                opacity: isLoadingServer ? 0.6 : 1,
               }}
-              onClick={loadConfig}
-              disabled={isLoadingConfig}
+              onClick={loadFromServer}
+              disabled={isLoadingServer || isSavingServer}
               title="Reload from server"
             >
-              {isLoadingConfig ? "Loading…" : "Reload"}
+              {isLoadingServer ? "Loading…" : "Reload"}
             </button>
 
             <button
@@ -461,26 +517,26 @@ export default function PersonalityStudioPage() {
                 background: "rgba(255,255,255,0.03)",
                 border: "1px solid rgba(138, 43, 226, 0.2)",
                 color: "#aaaaaa",
-                opacity: isSaving ? 0.6 : 1,
+                opacity: isSavingServer ? 0.6 : 1,
               }}
               onClick={saveDraft}
-              disabled={isSaving}
-              title="Save prompts without switching to v2"
+              disabled={isLoadingServer || isSavingServer}
+              title="Save locally only (does not affect calls)"
             >
-              {isSaving ? "Saving…" : "Save Draft"}
+              Save Draft
             </button>
 
             <button
               className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
               style={{
                 background: "linear-gradient(90deg, #8a2be2, #ff6a00)",
-                opacity: isSaving ? 0.6 : 1,
+                opacity: isSavingServer ? 0.6 : 1,
               }}
               onClick={publish}
-              disabled={isSaving}
-              title="Save and activate v2 for calls"
+              disabled={isLoadingServer || isSavingServer}
+              title="Save to server (affects new calls)"
             >
-              {isSaving ? "Publishing…" : "Publish"}
+              {isSavingServer ? "Publishing…" : "Publish"}
             </button>
           </div>
         </div>
@@ -528,7 +584,7 @@ export default function PersonalityStudioPage() {
                 <button
                   className="flex-1 px-4 py-2 rounded-lg text-white font-semibold"
                   style={{ background: "rgba(138, 43, 226, 0.25)", border: "1px solid rgba(138, 43, 226, 0.35)" }}
-                  onClick={() => alert("AI Generate will be wired next (4o-mini).")}
+                  onClick={() => alert("AI Generate will be wired later (4o-mini).")}
                 >
                   ✨ AI Generate
                 </button>
@@ -568,7 +624,7 @@ export default function PersonalityStudioPage() {
                 <button
                   className="flex-1 px-4 py-2 rounded-lg text-white font-semibold"
                   style={{ background: "rgba(138, 43, 226, 0.25)", border: "1px solid rgba(138, 43, 226, 0.35)" }}
-                  onClick={() => alert("AI Generate will be wired next (4o-mini).")}
+                  onClick={() => alert("AI Generate will be wired later (4o-mini).")}
                 >
                   ✨ AI Generate
                 </button>
@@ -633,45 +689,30 @@ export default function PersonalityStudioPage() {
             </Card>
           </div>
 
-          {/* Personality (still UI-only for now) */}
-          <Card title="Personality Presets & Sliders (UI-only for now)" icon="ri-sliders-line">
-            <div className="flex flex-wrap gap-2 mb-5">
-              {[
-                ["professional", "👔 Professional"],
-                ["friendly", "😊 Friendly"],
-                ["assertive", "💪 Assertive"],
-                ["empathetic", "❤️ Empathetic"],
-                ["flirtatious", "💋 Flirtatious"],
-                ["balanced", "⚖️ Balanced"],
-                ["concierge", "🛎️ Concierge"],
-                ["highEnergySales", "⚡ High Energy"],
-              ].map(([k, label]) => (
+          {/* Sliders */}
+          <Card title="Personality Presets & Sliders (UI-only for now)" icon="ri-sliders-4-line">
+            <div className="flex flex-wrap items-center gap-3">
+              {Object.keys(PRESETS).map((name) => (
                 <button
-                  key={k}
-                  className="px-3 py-2 rounded-lg text-sm"
+                  key={name}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold"
                   style={{
-                    border: "1px solid rgba(138, 43, 226, 0.25)",
-                    background: preset === k ? "rgba(138, 43, 226, 0.2)" : "rgba(255,255,255,0.03)",
-                    color: preset === k ? "#ff6a00" : "#aaaaaa",
+                    background: preset === name ? "rgba(138, 43, 226, 0.28)" : "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(138, 43, 226, 0.2)",
+                    color: preset === name ? "#ffffff" : "#aaaaaa",
                   }}
-                  onClick={() => applyPreset(k)}
+                  onClick={() => applyPreset(name)}
                 >
-                  {label}
+                  {name}
                 </button>
               ))}
-              {preset === "custom" && (
-                <div className="px-3 py-2 text-sm rounded-lg" style={{ color: "#fbbf24", border: "1px dashed rgba(251,191,36,0.5)" }}>
-                  Custom
-                </div>
-              )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Slider k="warmth" label="Warmth / Friendliness" value={sliders.warmth} onChange={setSlider} />
-              <Slider k="formality" label="Formality / Politeness" value={sliders.formality} onChange={setSlider} />
-              <Slider k="humor" label="Humor / Wit" value={sliders.humor} onChange={setSlider} />
-              <Slider k="directness" label="Directness / Brevity" value={sliders.directness} onChange={setSlider} />
-
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Slider k="warmth" label="Warmth" value={sliders.warmth} onChange={setSlider} />
+              <Slider k="formality" label="Formality" value={sliders.formality} onChange={setSlider} />
+              <Slider k="humor" label="Humor" value={sliders.humor} onChange={setSlider} />
+              <Slider k="directness" label="Directness" value={sliders.directness} onChange={setSlider} />
               <Slider k="empathy" label="Empathy" value={sliders.empathy} onChange={setSlider} />
               <Slider k="confidence" label="Confidence" value={sliders.confidence} onChange={setSlider} />
               <Slider k="curiosity" label="Curiosity" value={sliders.curiosity} onChange={setSlider} />
@@ -705,7 +746,7 @@ export default function PersonalityStudioPage() {
 
           {/* Voice + Memory + Preview */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card title="Voice Selection (UI-only for now)" icon="ri-mic-line">
+            <Card title="Voice Selection" icon="ri-mic-line">
               <label className="block text-sm text-purple-300 mb-2">OpenAI Voice</label>
               <select
                 className="w-full px-4 py-3 bg-[#0d0d12] border border-purple-500/30 rounded-lg text-white"
@@ -718,46 +759,33 @@ export default function PersonalityStudioPage() {
                   </option>
                 ))}
               </select>
-              <div className="text-xs text-gray-400 mt-2">(We’ll wire voice saving next.)</div>
+
+              <div className="text-xs text-gray-400 mt-2">
+                (Wiring later: this will save to customer config and apply on next call.)
+              </div>
             </Card>
 
-            <Card title="Memory Behavior (UI-only for now)" icon="ri-brain-2-line">
+            <Card title="Memory Behavior" icon="ri-brain-2-line">
               <label className="flex items-center gap-2 text-sm text-gray-200">
-                <input
-                  type="checkbox"
-                  checked={memPolicy.useName}
-                  onChange={(e) => setMemPolicy((m) => ({ ...m, useName: e.target.checked }))}
-                />
+                <input type="checkbox" checked={memPolicy.useName} onChange={(e) => setMemPolicy((m) => ({ ...m, useName: e.target.checked }))} />
                 Use caller name when confident
               </label>
               <label className="flex items-center gap-2 text-sm text-gray-200 mt-2">
-                <input
-                  type="checkbox"
-                  checked={memPolicy.referenceNaturally}
-                  onChange={(e) => setMemPolicy((m) => ({ ...m, referenceNaturally: e.target.checked }))}
-                />
+                <input type="checkbox" checked={memPolicy.referenceNaturally} onChange={(e) => setMemPolicy((m) => ({ ...m, referenceNaturally: e.target.checked }))} />
                 Reference past conversations naturally
               </label>
               <label className="flex items-center gap-2 text-sm text-gray-200 mt-2">
-                <input
-                  type="checkbox"
-                  checked={memPolicy.neverListMemory}
-                  onChange={(e) => setMemPolicy((m) => ({ ...m, neverListMemory: e.target.checked }))}
-                />
+                <input type="checkbox" checked={memPolicy.neverListMemory} onChange={(e) => setMemPolicy((m) => ({ ...m, neverListMemory: e.target.checked }))} />
                 Never list memories explicitly
               </label>
               <label className="flex items-center gap-2 text-sm text-gray-200 mt-2">
-                <input
-                  type="checkbox"
-                  checked={memPolicy.avoidRepeats}
-                  onChange={(e) => setMemPolicy((m) => ({ ...m, avoidRepeats: e.target.checked }))}
-                />
+                <input type="checkbox" checked={memPolicy.avoidRepeats} onChange={(e) => setMemPolicy((m) => ({ ...m, avoidRepeats: e.target.checked }))} />
                 Avoid repeating known facts
               </label>
             </Card>
           </div>
 
-          <Card title="Preview" icon="ri-eye-line">
+          <Card title="Preview (UI-only)" icon="ri-eye-line">
             <pre
               className="w-full p-4 rounded-lg text-xs overflow-auto"
               style={{
