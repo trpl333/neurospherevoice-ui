@@ -398,7 +398,7 @@ export default function Dashboard() {
   // DO NOT CHANGE — this is correct.
   // ---------------------------------------------------------------------------
   const handleNavigateToAISettings = () => {
-    window.REACT_APP_NAVIGATE('/ai-settings');
+    window.REACT_APP_NAVIGATE('/personality-studio');
   };
 
   const handleNavigateToPhoneSystem = () => {
